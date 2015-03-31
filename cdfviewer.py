@@ -1,11 +1,10 @@
 import sys, os, shutil
-sys.path.append("/afs/ipp/home/g/git/python/repository")
 import Tkinter as tk
 from tkFileDialog import askopenfilename, asksaveasfile
 import tkMessageBox
 
 import numpy as np
-import ufiles, read_equ, mom2rz, tksty, tkhyper, rz2psi
+import ufiles, read_equ, mom2rz, tkhyper, rz2psi
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 from matplotlib.figure import Figure
 import matplotlib.pylab as plt
@@ -92,14 +91,13 @@ class VIEWER:
         toolframe.pack_propagate(0)
         toolframe.pack(side=tk.BOTTOM, fill=tk.X)
 
-        print('%sButtonPlay.gif' %tksty.icon_dir)
-        self.playfig  = tk.PhotoImage(file=tksty.icon_dir + 'ButtonPlay.gif')
-        self.pausefig = tk.PhotoImage(file=tksty.icon_dir + 'ButtonPause.gif')
-        rewfig  = tk.PhotoImage(file=tksty.icon_dir + 'ButtonRewind.gif')
-        begfig  = tk.PhotoImage(file=tksty.icon_dir + 'ButtonFirst.gif')
-        endfig  = tk.PhotoImage(file=tksty.icon_dir + 'ButtonLast.gif')
-        prevfig = tk.PhotoImage(file=tksty.icon_dir + 'ButtonPrevious.gif')
-        nextfig = tk.PhotoImage(file=tksty.icon_dir + 'ButtonNext.gif')
+        self.playfig  = tk.PhotoImage(file='ButtonPlay.gif')
+        self.pausefig = tk.PhotoImage(file='ButtonPause.gif')
+        rewfig  = tk.PhotoImage(file='ButtonRewind.gif')
+        begfig  = tk.PhotoImage(file='ButtonFirst.gif')
+        endfig  = tk.PhotoImage(file='ButtonLast.gif')
+        prevfig = tk.PhotoImage(file='ButtonPrevious.gif')
+        nextfig = tk.PhotoImage(file='ButtonNext.gif')
 
         self.playbt = tk.Button(toolframe, command=self.play , image=self.playfig)
         rewbt  = tk.Button(toolframe, command=self.rewind, image=rewfig )
