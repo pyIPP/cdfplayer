@@ -28,6 +28,8 @@ class VIEWER:
 
     def __init__(self, f_cdf_in, list_file='', tok='AUGD'):
 
+
+        locdir = os.path.dirname(os.path.realpath(__file__))
         self.tok = tok
 
         self.runid     = f_cdf_in[-12:-4]
@@ -91,13 +93,13 @@ class VIEWER:
         toolframe.pack_propagate(0)
         toolframe.pack(side=tk.BOTTOM, fill=tk.X)
 
-        self.playfig  = tk.PhotoImage(file='ButtonPlay.gif')
-        self.pausefig = tk.PhotoImage(file='ButtonPause.gif')
-        rewfig  = tk.PhotoImage(file='ButtonRewind.gif')
-        begfig  = tk.PhotoImage(file='ButtonFirst.gif')
-        endfig  = tk.PhotoImage(file='ButtonLast.gif')
-        prevfig = tk.PhotoImage(file='ButtonPrevious.gif')
-        nextfig = tk.PhotoImage(file='ButtonNext.gif')
+        self.playfig  = tk.PhotoImage(file='%s/ButtonPlay.gif'  %locdir)
+        self.pausefig = tk.PhotoImage(file='%s/ButtonPause.gif' %locdir)
+        rewfig  = tk.PhotoImage(file='%s/ButtonRewind.gif'   %locdir)
+        begfig  = tk.PhotoImage(file='%s/ButtonFirst.gif'    %locdir)
+        endfig  = tk.PhotoImage(file='%s/ButtonLast.gif'     %locdir)
+        prevfig = tk.PhotoImage(file='%s/ButtonPrevious.gif' %locdir)
+        nextfig = tk.PhotoImage(file='%s/ButtonNext.gif'     %locdir)
 
         self.playbt = tk.Button(toolframe, command=self.play , image=self.playfig)
         rewbt  = tk.Button(toolframe, command=self.rewind, image=rewfig )
@@ -310,7 +312,7 @@ class VIEWER:
 
         data = {}
         for lbl in cdf1d + cdf2d + coord:
-            data[lbl] = cv[lbl][self.jt]
+            data[lbl] = self.cv[lbl][self.jt]
 
         data['fpol'] = -0.01*data['GFUN']*data['BZXR']
 
