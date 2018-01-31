@@ -1,16 +1,20 @@
 import sys, os, shutil
-sys.path.append('/afs/ipp/home/g/git/python/repository')
 import Tkinter as tk
-import ttk
 from tkFileDialog import askopenfilename, asksaveasfile
 import tkMessageBox
 
 import numpy as np
-import ufiles, read_equ, mom2rz, tkhyper, rz2psi
+import ufiles, read_equ, mom2rz, tkhyper, rz2psi, tr_path
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 from matplotlib.figure import Figure
 import matplotlib.pylab as plt
 from scipy.io import netcdf
+
+
+nxcol = '#50c050'
+qtcol = '#f00000'
+svcol = '#a0a0d0'
+encol = '#dddddd'
 
 
 class VIEWER:
@@ -37,22 +41,24 @@ class VIEWER:
         print('Setting GUI frame')
         self.viewframe = tk.Tk()
         self.viewframe.title('Profile viewer')
-        self.viewframe.geometry('1600x960')
 
 # Menu bar
 
         menubar = tk.Menu(self.viewframe)
 
         filemenu = tk.Menu(menubar, tearoff=0)
+        filemenu.add_command(label="Play"       , command=self.play)
         filemenu.add_command(label="Load run...", command=self.callcdf)
-        filemenu.add_command(label="Display variables...", command=self.display_vars)
         filemenu.add_separator()
         filemenu.add_command(label="Exit", command=sys.exit)
 
         editmenu = tk.Menu(menubar, tearoff=0)
-        editmenu.add_command(label="Load setup...", command=self.callset)
+        editmenu.add_command(label="Load setup...", command=self.callback)
         editmenu.add_command(label="Save setup...", command=self.callsave)
         editmenu.add_command(label="Edit setup...", command=self.editlist)
+
+        dispmenu = tk.Menu(menubar, tearoff=0)
+        dispmenu.add_command(label="Display variables...", command=self.display_vars)
 
         savemenu = tk.Menu(menubar, tearoff=0)
         savemenu.add_command(label="Save 1D u-file(t)"          , command=self.uf1t)
@@ -69,80 +75,61 @@ class VIEWER:
 
         menubar.add_cascade(label="File"  ,  menu=filemenu)
         menubar.add_cascade(label="Setup" ,  menu=editmenu)
+        menubar.add_cascade(label="Display", menu=dispmenu)
         menubar.add_cascade(label="Output",  menu=savemenu)
         menubar.add_cascade(label="Help"  ,  menu=helpmenu)
 
         self.viewframe.config(menu = menubar)
 
-# Frames in main widet
+# Figure frame
 
-        self.canv_frame = tk.Frame(self.viewframe, height=900)
-        self.canv_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-        self.canv_frame.pack_propagate(0)
+        self.outframe = tk.Frame(self.viewframe)
+        self.viewfig = Figure()
+        self.canvas = FigureCanvasTkAgg(self.viewfig, master=self.outframe)
 
-        toolframe = tk.Frame(self.viewframe, height=45)
-        toolframe.pack(side=tk.BOTTOM, fill=tk.X)
-        toolframe.pack_propagate(0)
-
-# Plots
-
-        self.nbpol = ttk.Notebook(self.canv_frame, name='nbpol')
-        self.nbpol.pack(side=tk.TOP, fill=tk.X)
-        self.nbpol.bind('<Button-1>', self.on_click)
-  
-        frame_eq = tk.Frame(self.nbpol)
-        frame_1d = tk.Frame(self.nbpol)
-        frame_2d = tk.Frame(self.nbpol)
-
-        self.nbpol.add(frame_eq, text='Equilibirum')
-        self.nbpol.add(frame_1d, text='Scalars    ')
-        self.nbpol.add(frame_2d, text='Profiles   ')
-
-        self.fig_eq = Figure(figsize=(14., 8.5), dpi=100)
-        self.fig_1d = Figure(figsize=(14., 8.5), dpi=100)
-        self.fig_2d = Figure(figsize=(14., 8.5), dpi=100)
-        self.fig_eq.subplots_adjust(left=0.01, bottom=0.1, right=0.95, top=0.95)
-        self.fig_1d.subplots_adjust(left=0.05, bottom=0.1, right=0.97, top=0.92, \
-            wspace=0.3, hspace=0.3)
-        self.fig_2d.subplots_adjust(left=0.05, bottom=0.1, right=0.97, top=0.92, \
-            wspace=0.3, hspace=0.3)
-        self.canv_eq = FigureCanvasTkAgg(self.fig_eq, master=frame_eq)
-        self.canv_1d = FigureCanvasTkAgg(self.fig_1d, master=frame_1d)
-        self.canv_2d = FigureCanvasTkAgg(self.fig_2d, master=frame_2d)
-        self.canv_eq._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-        self.canv_1d._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-        self.canv_2d._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-
-# Navigation toolbars
-
-        toolbar = NavigationToolbar2TkAgg( self.canv_eq, frame_eq)
-        toolbar.update()
-        toolbar = NavigationToolbar2TkAgg( self.canv_1d, frame_1d)
-        toolbar.update()
-        toolbar = NavigationToolbar2TkAgg( self.canv_2d, frame_2d)
+# Navigation toolbar
+        toolbar = NavigationToolbar2TkAgg( self.canvas, self.viewframe)
         toolbar.update()
 
 # Toolbar
 
+        toolframe = tk.Frame(self.viewframe, height=45)
+        toolframe.pack_propagate(0)
+        toolframe.pack(side=tk.BOTTOM, fill=tk.X)
+
         self.playfig  = tk.PhotoImage(file='%s/ButtonPlay.gif'  %locdir)
         self.pausefig = tk.PhotoImage(file='%s/ButtonPause.gif' %locdir)
-        rewfig  = tk.PhotoImage(file='%s/ButtonBack.gif'     %locdir)
+        rewfig  = tk.PhotoImage(file='%s/ButtonRewind.gif'   %locdir)
+        begfig  = tk.PhotoImage(file='%s/ButtonFirst.gif'    %locdir)
+        endfig  = tk.PhotoImage(file='%s/ButtonLast.gif'     %locdir)
         prevfig = tk.PhotoImage(file='%s/ButtonPrevious.gif' %locdir)
         nextfig = tk.PhotoImage(file='%s/ButtonNext.gif'     %locdir)
 
         self.playbt = tk.Button(toolframe, command=self.play , image=self.playfig)
         rewbt  = tk.Button(toolframe, command=self.rewind, image=rewfig )
+        begbt  = tk.Button(toolframe, command=self.begin , image=begfig )
+        endbt  = tk.Button(toolframe, command=self.end   , image=endfig )
         prevbt = tk.Button(toolframe, command=self.prev  , image=prevfig)
         nextbt = tk.Button(toolframe, command=self.next  , image=nextfig)
-        for but in self.playbt, rewbt, prevbt, nextbt:
+        for but in self.playbt, rewbt, begbt, endbt, prevbt, nextbt:
             but.pack(side=tk.LEFT)
 
         self.crntsc = tk.Scale(toolframe, command=self.jump, \
                                orient=tk.HORIZONTAL, length=300)
         self.crntsc.pack(side=tk.LEFT)
 
+        tk.Button(toolframe, text='Equ', bg=nxcol, command=self.view_equ).pack(side=tk.RIGHT)
+        tk.Button(toolframe, text='2D', bg=nxcol, command=self.view2d).pack(side=tk.RIGHT)
+        tk.Button(toolframe, text='1D', bg=nxcol, command=self.view1d).pack(side=tk.RIGHT)
+
+        self.switch = 0
+
 # Set up plot
         self.load()
+#        try:
+#            self.load()
+#        except:
+#            print('Select a CDF file via File->Load run...')
 
         self.viewframe.mainloop()
 
@@ -151,12 +138,6 @@ class VIEWER:
 
         mytext = 'Documentation at <a href="http://www.aug.ipp.mpg.de/aug/manuals/transp/output/cdfplayer.html">cdfplayer homepage</a>'
         h = tkhyper.HyperlinkMessageBox("Help", mytext, "340x60")
-
-
-    def on_click(self, event):
-        if event.widget.identify(event.x, event.y) == 'label':
-            self.jtab = event.widget.index('@%d,%d' % (event.x, event.y))
-        self.replot()
 
 
     def read(self, f_cdf):
@@ -186,11 +167,13 @@ class VIEWER:
             f.close()
             print('Using profile list from file %s' %self.list_file)
         elif pr_list == None:
-            pr_list = ['CUR', 'TE', 'NE', 'V', 'BPOL', 'NEUTT', 'NIMP', 'PINJ', 'TAUEA']
+            pr_list = ['CUR', 'TE', 'NE', 'V', 'BPOL', 'NEUTT']
  
+        self.xnp  = self.cv['X'].data
+        self.xbnp = self.cv['XB'].data
         self.time = self.cv['TIME3'].data
-        self.rho  = self.cv['X'][0, :]
-        self.rhob = self.cv['XB'][0, :]
+        self.rho  = self.xnp[0, :]
+        self.rhob = self.xbnp[0, :]
         self.ynp  = {}
         self.lbl  = {}
         self.dim  = {}
@@ -210,100 +193,101 @@ class VIEWER:
                 else:
                     self.trace_list.append(sig)
             else:
-                print('No variable %s in CDF file, ignoring!' %sig)
+                print('%s not in CDF variables, dropping!' %sig)
 
-        if len(self.trace_list) > 15:
-            print('Too many time traces, taking only the first 15'
-            self.trace_list = self.trace_list[:15]
-        if len(self.prof_list) > 15:
-            print('Too many profiles, taking only the first 15'
-            self.prof_list = self.prof_list[:15]
-        nrow = 3
-        ncol = 5
+        nprof = max(len(self.prof_list), len(self.trace_list))
+        self.nrow = 3
+        cols = float(nprof)/float(self.nrow)
+        self.ncol = int(cols) + 1
+        if cols == int(cols):
+            self.ncol += -1
 
-# Equilibrium
+        self.R, self.Z = mom2rz.mom2rz(self.surf.rc, \
+            self.surf.rs, self.surf.zc, self.surf.zs, nthe=201)
 
-        npoints = 201
-        Rin, Zin = mom2rz.mom2rz(self.surf.rc, \
-            self.surf.rs, self.surf.zc, self.surf.zs, nthe=npoints)
+        self.n_rho = self.R.shape[1]
 
-        nt, self.n_rho, npoints = Rin.shape
-        self.R = np.zeros((nt, self.n_rho, npoints+1))
-        self.Z = np.zeros((nt, self.n_rho, npoints+1))
-        self.R[:, :, :-1] = Rin
-        self.Z[:, :, :-1] = Zin
-        self.R[:, :, -1] = self.R[:, :, 0]
-        self.Z[:, :, -1] = self.Z[:, :, 0]
 
-# Plots
+    def view1d(self):
 
+        self.switch = 1
+        self.set_can()
+
+
+    def view2d(self):
+
+        self.switch = 0
+        self.set_can()
+
+
+    def view_equ(self):
+
+        self.switch = 2
+        self.set_can()
+
+
+    def set_can(self):
+
+        self.viewfig.clf()
+        self.viewfig.set_canvas(self.canvas)
+        self.txt = self.viewfig.text(0.5, 0.98, '', ha='center', va='top')
         fsize = 12
 
-        self.fig_eq.clf()
-        self.fig_1d.clf()
-        self.fig_2d.clf()
+        if self.switch == 1:
+            jplot = 1
+            for trace in self.trace_list:
+                unit = ' [%s]' %self.unit[trace].strip()
+                if unit.strip() == '[]':
+                    unit = ''
+                ylab = trace + unit
 
-        self.fig_eq.text(0.5, 0.99, self.runid, ha='center', va='top')
-        self.fig_1d.text(0.5, 0.99, self.runid, ha='center', va='top')
-        self.fig_2d.text(0.5, 0.99, self.runid, ha='center', va='top')
-        self.txt_eq = self.fig_eq.text(0.5, 0.97, '', ha='center', va='top')
-        self.txt_1d = self.fig_1d.text(0.5, 0.97, '', ha='center', va='top')
-        self.txt_2d = self.fig_2d.text(0.5, 0.97, '', ha='center', va='top')
+                self.axes1d = self.viewfig.add_subplot(self.nrow, self.ncol, jplot)
+                self.axes1d.set_xlabel('t [s]', fontsize=fsize)
+                self.axes1d.set_ylabel(ylab, fontsize=fsize)
+                self.line1d[trace], = self.axes1d.plot(self.time, self.ynp[trace][:], 'b-')
+                self.axes1d.grid('on')
+                self.mark1d[trace], = self.axes1d.plot(self.time[0], self.ynp[trace][0], 'go')
+                jplot += 1
 
-        ax_eq = self.fig_eq.add_subplot(1, 1, 1, aspect='equal')
-        for jrho in range(self.n_rho):
-            self.equline[jrho],  = ax_eq.plot(self.R[self.jt, jrho, :], self.Z[self.jt, jrho, :], 'g-')
-        self.equline['axis'], = ax_eq.plot(self.surf.r_mag[self.jt], self.surf.z_mag[self.jt], 'g+')
-        ax_eq.set_xlabel('R [cm]', fontsize=fsize)
-        ax_eq.set_ylabel('z [cm]', fontsize=fsize)
+        elif self.switch == 0:
+            jplot = 1
+            for prof in self.prof_list:
+                if 'X' in self.dim[prof]:
+                    xrho = self.rho
+                    xlab = r'$\rho_{tor}$(X)'
+                if 'XB' in self.dim[prof]:
+                    xrho = self.rhob
+                    xlab = r'$\rho_{tor}$(XB)'
+                unit = ' [%s]' %self.unit[prof].strip()
+                if unit.strip() == '[]':
+                    unit = ''
+                ylab = prof + unit
+
+                self.axes2d = self.viewfig.add_subplot(self.nrow, self.ncol, jplot)
+                self.axes2d.set_xlim([0, 1.])
+                self.axes2d.set_ylim([0, 1.1*np.max(self.ynp[prof])])
+                self.axes2d.set_xlabel(xlab, fontsize=fsize)
+                self.axes2d.set_ylabel(ylab, fontsize=fsize)
+                self.line2d[prof], = self.axes2d.plot(xrho, self.ynp[prof][0, :], 'b-')
+                self.axes2d.grid('on')
+                jplot += 1
+
+
+        else:
+
+            self.equ = self.viewfig.add_subplot(1, 1, 1, aspect='equal')
+            for jrho in range(self.n_rho):
+                self.equline[jrho],  = self.equ.plot(self.R[self.jt, jrho, :], self.Z[self.jt, jrho, :], 'g-')
+                self.equline2[jrho], = self.equ.plot(self.R[self.jt, jrho, [-1, 0]], self.Z[self.jt, jrho, [-1, 0]], 'g-')
+            self.equline['axis'], = self.equ.plot(self.surf.r_mag[self.jt], self.surf.z_mag[self.jt], 'g+')
 
 # Plot AUG structures
-        nshot = int(self.runid[0:5])
-        try:
-            import plot_aug
-            plot_aug.vessel_pol(ax_eq, fac=100.)
-        except:
-            pass
-
-        jplot = 1
-        for trace in self.trace_list:
-            ylab = '%s [%s]' %(trace, self.unit[trace].strip())
-
-            ax_1d = self.fig_1d.add_subplot(nrow, ncol, jplot)
-            ax_1d.set_xlabel('t [s]', fontsize=fsize)
-            ax_1d.set_ylabel(ylab, fontsize=fsize)
-            self.line1d[trace], = ax_1d.plot(self.time, self.ynp[trace][:], 'b-')
-            ax_1d.grid('on')
-            self.mark1d[trace], = ax_1d.plot(self.time[0], self.ynp[trace][0], 'go')
-            jplot += 1
-            ax_1d.ticklabel_format(axis='y', style='sci', scilimits=(-4,-4))
-            ax_1d.yaxis.major.formatter._useMathText = True
-
-        jplot = 1
-        for prof in self.prof_list:
-            if 'X' in self.dim[prof]:
-                xrho = self.rho
-                xlab = r'$\rho_{tor}$(X)'
-            if 'XB' in self.dim[prof]:
-                xrho = self.rhob
-                xlab = r'$\rho_{tor}$(XB)'
-            ylab = '%s [%s]' %(prof, self.unit[prof].strip())
-
-            ax_2d = self.fig_2d.add_subplot(nrow, ncol, jplot)
-            ax_2d.set_xlim([0, 1.])
-            ax_2d.set_ylim([0, 1.1*np.max(self.ynp[prof])])
-            ax_2d.set_xlabel(xlab, fontsize=fsize)
-            ax_2d.set_ylabel(ylab, fontsize=fsize)
-            self.line2d[prof], = ax_2d.plot(xrho, self.ynp[prof][0, :], 'b-')
-            ax_2d.grid('on')
-            ax_2d.ticklabel_format(axis='y', style='sci', scilimits=(-4,-4))
-            ax_2d.yaxis.major.formatter._useMathText = True
-            jplot += 1
-
-        self.canv_eq.draw()
-        self.canv_1d.draw()
-        self.canv_2d.draw()
-        self.jtab = 0
+            nshot = int(self.runid[0:5])
+            if self.tok == 'AUGD':
+                import map_equ_20161123
+                gc_r, gc_z = map_equ_20161123.get_gc()
+                for key in gc_r.iterkeys():
+                    self.equ.plot(100*gc_r[key], 100*gc_z[key], 'b-')
 
         self.replot()
 
@@ -485,30 +469,48 @@ class VIEWER:
 
     def replot(self, reset=True):
 
-#        if hasattr(self, 'crntsc') and reset:
-        if reset:
+        if hasattr(self, 'crntsc') and reset:
             self.crntsc.set(float(self.jt)/(self.nt - 1)*100.)
 
-        strtim = 't =%6.3f s' %self.time[self.jt]
-        if self.jtab == 0:
-            for jrho in range(self.n_rho):
-                self.equline [jrho].set_data(self.R[self.jt, jrho, :], self.Z[self.jt, jrho, :])
-            self.txt_eq.set_text(strtim)
-# Plot mag. axis:
-            self.equline['axis'].set_data(self.surf.r_mag[self.jt], self.surf.z_mag[self.jt])
-            self.canv_eq.draw()
-            
-        elif self.jtab == 1:
-            for trace in self.trace_list:
-                self.mark1d[trace].set_data(self.time[self.jt], self.ynp[trace][self.jt])
-            self.txt_1d.set_text(strtim)
-            self.canv_1d.draw()
-
-        elif self.jtab == 2:
+        if self.switch == 0:
+            #profile plot:
+            strtim = '%s    Time:%9.3f s' %(self.runid, self.time[self.jt])
             for prof in self.prof_list:
                 self.line2d[prof].set_ydata(self.ynp[prof][self.jt, :])
-            self.txt_2d.set_text(strtim)
-            self.canv_2d.draw()
+        elif self.switch == 1:
+            strtim = '%s    Time:%9.3f s' %(self.runid, self.time[self.jt])
+            for trace in self.trace_list:
+                self.mark1d[trace].set_data(self.time[self.jt], self.ynp[trace][self.jt])
+
+        else:
+            #Equilibrium plot:
+            strtim = '%s    Time:%9.3f s' %(self.runid, self.surf.time[self.jt])
+            for jrho in range(self.n_rho):
+                #plot flux surfaces:
+                self.equline [jrho].set_data(self.R[self.jt, jrho, :], self.Z[self.jt, jrho, :])
+                self.equline2[jrho].set_data(self.R[self.jt, jrho, [-1, 0]], self.Z[self.jt, jrho, [-1, 0]])
+            
+            #plot mag. axis:
+            self.equline['axis'].set_data(self.surf.r_mag[self.jt], self.surf.z_mag[self.jt])
+
+        self.txt.set_text(strtim)
+        self.canvas.draw()
+
+
+    def begin(self):
+
+        self.ff = False
+        self.rw = False
+        self.jt = 0
+        self.replot()
+
+
+    def end(self):
+
+        self.ff = False
+        self.rw = False
+        self.jt = self.nt-1
+        self.replot()
 
 
     def prev(self):
@@ -559,7 +561,7 @@ class VIEWER:
         while self.ff and self.jt < self.nt - 1:
             self.jt += 1
             self.replot()
-            self.canv_eq.start_event_loop(self.timeout)
+            self.canvas.start_event_loop(self.timeout)
 
 
     def rewind(self):
@@ -569,25 +571,28 @@ class VIEWER:
         while self.rw and self.jt > 0:
             self.jt -= 1
             self.replot()
-            self.canv_eq.start_event_loop(self.timeout)
+            self.canvas.start_event_loop(self.timeout)
 
 
     def callcdf(self):
 
-        dir_in = '%s/tr_client/%s' %(os.getenv('HOME'), self.tok)
+        dir_in = os.getenv('HOME') + '/tr_client/AUGD'
         self.cdf_file = askopenfilename(initialdir=dir_in, filetypes=[("All formats", "*.CDF")])
         self.load()
 
 
-    def callset(self):
+    def callback(self):
 
         self.list_file = askopenfilename(initialdir=self.dir_set, filetypes=[("All formats", "*.txt")])
         self.jt = 0
         self.equline  = {}
+        self.equline2 = {}
         self.mark1d = {}
         self.line1d = {}
         self.line2d = {}
         self.set_plots()
+        self.resize_frame()
+        self.set_can()
 
 
     def callsave(self):
@@ -632,9 +637,12 @@ class VIEWER:
                 try:
                     self.viewer.jt = 0
                     self.viewer.equline = {}
+                    self.viewer.equline2 = {}
                     self.viewer.line1d = {}
                     self.viewer.line2d = {}
                     self.viewer.set_plots(pr_list=newsigs)
+                    self.viewer.resize_frame()
+                    self.viewer.set_can()
                     self.top.destroy()
                 except Exception, e:
                     tkMessageBox.showerror('Error', 'This went wrong: %s'%repr(e))
@@ -644,16 +652,30 @@ class VIEWER:
         dialog = ProfilesDialog(self.viewframe, self, profiles=profiles)
 
 
+    def resize_frame(self):
+
+        geo = str(max(self.ncol*350, 700))+'x950'
+        print('Frame geometry %s' %geo)
+        self.viewframe.geometry(geo)
+        self.outframe.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        self.viewfig.set_size_inches((4.5*self.ncol, 10.8))
+        self.viewfig.subplots_adjust(left=0.08, bottom=0.05, right=0.95, top=0.95)
+        self.canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+
     def load(self):
 
         self.jt = 0
         self.runid = self.cdf_file[-12:-4]
         self.equline  = {}
+        self.equline2 = {}
         self.mark1d = {}
         self.line1d = {}
         self.line2d = {}
         self.read(self.cdf_file)
         self.set_plots()
+        self.resize_frame()
+        self.set_can()
 
 
     def display_vars(self):
@@ -722,7 +744,6 @@ if __name__ == "__main__":
             print('Usage: cdfplayer [<cdf file> [<profile list file>]]')
             sys.exit()
         else:
-            import tr_path
             tr = tr_path.TR_PATH(f)
             f = tr.fcdf
         if os.path.isfile(f):
