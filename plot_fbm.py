@@ -32,7 +32,8 @@ class FBM:
 
         menubar = tk.Menu(polframe)
         filemenu = tk.Menu(menubar, tearoff=0)
-        filemenu.add_command(label="Read FBM...", command=self.load_fbm)
+        filemenu.add_command(label="Read FBM..." , command=self.load_fbm)
+        filemenu.add_command(label="Plot dist...", command=self.plot_dist)
         filemenu.add_separator()
         filemenu.add_command(label="Exit", command=sys.exit)
         helpmenu = tk.Menu(menubar, tearoff=0)
@@ -47,18 +48,22 @@ class FBM:
 
         fbmplotsframe   = tk.Frame(nb)
         self.birthframe = tk.Frame(nb)
+        self.neutframe  = tk.Frame(nb)
+        self.trapframe  = tk.Frame(nb)
 
-        nb.add(fbmplotsframe  , text='FBM')
+        nb.add(fbmplotsframe  , text='2D dist')
+        nb.add(self.trapframe , text='Trap. frac.')
+        nb.add(self.neutframe , text='Bt BB neut')
         nb.add(self.birthframe, text='Birth profile')
 
-        self.canv_frame = tk.Frame(fbmplotsframe, width=630)
-        self.canv_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
-        self.canv_frame.pack_propagate(0)
+        self.distframe = tk.Frame(fbmplotsframe, width=630)
+        self.distframe.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
+        self.distframe.pack_propagate(0)
 
         right_frame = tk.Frame(fbmplotsframe, width=870)
         right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
         right_frame.pack_propagate(0)
-        
+
         comm_frame = tk.Frame(right_frame)
         comm_frame.pack(side=tk.TOP, fill=tk.BOTH)
         bdens_frame = tk.Frame(right_frame)
@@ -69,40 +74,41 @@ class FBM:
 # Buttons
 
         box = {}
-        n_hframes = 5
+        n_hframes = 6
         for jframe in range(n_hframes):
             box[jframe] = tk.Frame(comm_frame)
-            box[jframe].pack(side=tk.TOP, fill=tk.X)
+            box[jframe].pack(side=tk.TOP, fill=tk.X, pady=2)
 
         self.th_int    = tk.BooleanVar()
         self.vol_int   = tk.BooleanVar()
         self.log_scale = tk.BooleanVar()
         self.log_scale.set(True)
 
-        lb1 = tk.Label(box[0], text='Right mouse click on a cell for FBM', fg="#900000", pady=5)
-        cb1 = tk.Checkbutton(box[1], text='Theta averaged FBM', variable=self.th_int)
-        cb2 = tk.Checkbutton(box[2], text='Volume averaged FBM', variable=self.vol_int)
+        lb1 = tk.Label(box[0], text='Right mouse click on a cell for FBM', fg="#900000")
+
+        cb1 = tk.Checkbutton(box[2], text='Theta averaged FBM', variable=self.th_int)
+        cb2 = tk.Checkbutton(box[3], text='Volume averaged FBM', variable=self.vol_int)
 
         for but in (cb1, cb2, lb1):
             but.pack(side=tk.TOP, anchor=tk.W, padx=10, pady=2)
 
-        Elbl = tk.Label(box[3], text='Emax [keV]', pady=5)
-        self.Emax = tk.Entry(box[3], width=12, bg='#ffffff')
+        Elbl = tk.Label(box[4], text='Emax [keV]')
+        self.Emax = tk.Entry(box[4], width=12, bg='#ffffff')
         self.Emax.insert(0, 100)
         for but in (Elbl, self.Emax):
             but.pack(side=tk.LEFT, anchor=tk.W, padx=10, pady=2)
 
-        cb3 = tk.Checkbutton(box[4], text='Log scale', variable=self.log_scale)
-        fminlbl = tk.Label(box[4], text='f_log_min', pady=5)
-        fmaxlbl = tk.Label(box[4], text='f_log_max', pady=5)
-        self.fmin = tk.Entry(box[4], width=12, bg='#ffffff')
+        cb3 = tk.Checkbutton(box[5], text='Log scale', variable=self.log_scale)
+        fminlbl = tk.Label(box[5], text='f_log_min', pady=5)
+        fmaxlbl = tk.Label(box[5], text='f_log_max', pady=5)
+        self.fmin = tk.Entry(box[5], width=12, bg='#ffffff')
         self.fmin.insert(0, 4.5)
-        self.fmax = tk.Entry(box[4], width=12, bg='#ffffff')
+        self.fmax = tk.Entry(box[5], width=12, bg='#ffffff')
         self.fmax.insert(0, 8.5)
         for but in (cb3, fminlbl, self.fmin, fmaxlbl, self.fmax):
             but.pack(side=tk.LEFT, anchor=tk.W, padx=10, pady=2)
 
-# BDENS canvas
+# Bdens plot
 
         fig_bdens = Figure(figsize=(3.5, 3.), dpi=100)
         axbdens = fig_bdens.add_subplot(1, 1, 1)
@@ -113,9 +119,12 @@ class FBM:
         axbdens.set_ylabel('BDENS [1/cm**3]',fontsize=self.fsize)
         axbdens.set_xlim([0, 1])
         axbdens.set_ylim([0, 1e13])
+
         self.bdplot1, = axbdens.plot([], [], 'r-', label='From FBM')
         self.bdplot2, = axbdens.plot([], [], 'g-', label='From CDF')
         axbdens.legend()
+
+# Cell plot
 
         self.fig_cell  = Figure(figsize=(3.5, 3.), dpi=100)
         self.axcell = self.fig_cell.add_subplot(1, 1, 1)
@@ -129,10 +138,13 @@ class FBM:
         toolbar.update()
 
 
+        self.can_fbm   = {}
+        self.cell_mark = {}
+
 # Poloidal canvas 
 
         fig_pol = Figure()
-        self.can_pol = FigureCanvasTkAgg(fig_pol, master=self.canv_frame)
+        self.can_pol = FigureCanvasTkAgg(fig_pol, master=self.distframe)
         self.can_pol._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
         axpol = fig_pol.add_subplot(1, 1, 1, aspect='equal')
@@ -151,14 +163,17 @@ class FBM:
         h = tkhyper.HyperlinkMessageBox("Help", mytext, "300x60")
 
 
-    def fig_plot(self, frame, title, zdata, zmin=None, zmax=None):
+    def fig_plot(self, frame, title, zdata, zmin=None, zmax=None, spc_lbl=None):
 
-        
-        fbmfile  = self.fbm_file.split('/')[-1]
+
+        fbmfile  = self.ffbm.split('/')[-1]
         runid    = fbmfile[:8]
 
         print('Plot %s' %title)
         title += ', Run %s, t =%6.3f s' %(runid, self.fbmr.time)
+
+        for child in frame.winfo_children():
+            child.destroy()
 
         fig = Figure()
         can = FigureCanvasTkAgg(fig, master=frame)
@@ -190,9 +205,10 @@ class FBM:
         norm = mpl.colors.Normalize(vmin=zmin, vmax=zmax)
         cb_ax = fig.add_axes([0.82, 0.08, 0.09, 0.84])
         mpl.colorbar.ColorbarBase(cb_ax,norm=norm,boundaries=bounds,ticks=bounds)
-        if title[:7] == '2D fast':
-            self.can_fbm = can
-            self.axfbm = ax
+
+        if spc_lbl is not None:
+            self.can_fbm[spc_lbl]    = can
+            self.cell_mark[spc_lbl], = ax.plot([], [], 'ro')
 
 # Toolbar
         toolbar = NavigationToolbar2TkAgg(can, frame)
@@ -202,28 +218,32 @@ class FBM:
     def load_fbm(self):
 
         dir_init = os.getenv('HOME')+'/tr_client/AUGD'
-        ffbm = askopenfilename(  initialdir=dir_init, filetypes= \
+        self.ffbm = askopenfilename(  initialdir=dir_init, filetypes= \
                                     (("FBM", "*.cdf"),)    )
 
-        print(ffbm)
+        print(self.ffbm)
 
-        if ffbm.strip() == '':
+        if self.ffbm.strip() == '':
             showerror("Error", 'Select a FBM file: run File->read_fbm')
         else:
-            self.read_fbm(ffbm)
+            self.read_fbm()
 
 
-    def read_fbm(self, ffbm):
+    def read_fbm(self):
 
-        fbmfile  = ffbm.split('/')[-1]
+        fbmfile  = self.ffbm.split('/')[-1]
         runid    = fbmfile[:8]
         t_id     = fbmfile[12:13]
-        self.fbm_file = ffbm
-        self.fbmr = read_fbm.READ_FBM(self.fbm_file)
+        self.fbmr = read_fbm.READ_FBM(self.ffbm)
+        self.plot_dist()
+        birth_file =  '%s_birth.cdf%s' %(self.ffbm[:-9], t_id)
+        plot_birth.read_birth(birth_file, topframe=self.birthframe)
 
+
+    def plot_dist(self):
 # Neutrons
 
-        tr_file = self.fbm_file[:-9] + '.CDF'
+        tr_file = self.ffbm[:-9] + '.CDF'
         if not os.path.isfile(tr_file):
             print('%s not found' %tr_file)
             showerror("Error", '%s not found')
@@ -247,7 +267,9 @@ class FBM:
 
 # Right frame: BDENS
 
-        self.bdplot1.set_data(self.fbmr.rho_grid, self.fbmr.bdens)
+# BDENS canvas
+
+        self.bdplot1.set_data(self.fbmr.rho_grid, self.fbmr.bdens['D_NBI'])
         self.bdplot2.set_data(cv['X'][jtclose, :], cv['BDENS'][jtclose, :])
         self.can_bdens.draw()
 
@@ -255,88 +277,92 @@ class FBM:
 
         if hasattr(self, 'can_pol'):
             self.can_pol.get_tk_widget().destroy()
-        nbpol = ttk.Notebook(self.canv_frame, name='nbpol')
-        nbpol.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-
-        fbmframe  = tk.Frame(nbpol)
-        trapframe = tk.Frame(nbpol)
-        btframe   = tk.Frame(nbpol)
-        bbframe   = tk.Frame(nbpol)
-
-        nbpol.add(fbmframe  , text='2D fast ion')
-        nbpol.add(trapframe , text='Trapped fraction')
-        nbpol.add(btframe   , text='Beam-target neut')
-        nbpol.add(bbframe   , text='Beam-beam neut')
 
         if hasattr(self, 'x_grid'):
             del self.x_grid, self.y_grid
+        
+# Neutrons
+        for child in self.neutframe.winfo_children():
+            child.destroy()
+        btframe = tk.Frame(self.neutframe)
+        bbframe = tk.Frame(self.neutframe)
+        for frame in btframe, bbframe:
+            frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
+
+        self.fig_plot(btframe, 'Beam-target neutrons', btneut)
+        self.fig_plot(bbframe, 'Beam-beam neutrons'  , bbneut)
+
 # FBM
-        title = r'2D fast ion density, $\int\int$ dE dp.a.'
-        self.fig_plot(fbmframe, title, self.fbmr.int_en_pit, zmin=0)
-        self.line1, = self.axfbm.plot([], [], 'ro')
-        self.cid = self.can_fbm.mpl_connect('button_press_event', self.my_call)
+
+        for child in self.distframe.winfo_children():
+            child.destroy()
+        for child in self.trapframe.winfo_children():
+            child.destroy()
+
+        self.nbdist = ttk.Notebook(self.distframe, name='nb')
+        self.nbdist.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+        nbtrap = ttk.Notebook(self.trapframe, name='nb')
+        nbtrap.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+        self.species = []
+        for spc_lbl in self.fbmr.frac_trap.keys():
+            self.species.append(spc_lbl)
+            dframe = tk.Frame(self.nbdist)
+            self.nbdist.add(dframe, text=spc_lbl)
+            trapframe = tk.Frame(nbtrap)
+            nbtrap.add(trapframe, text=spc_lbl)
+
+            title = r'2D distribution %s, $\int\int$ dE dp.a.' %spc_lbl
+            self.fig_plot(dframe, title, self.fbmr.int_en_pit[spc_lbl], zmin=0, spc_lbl=spc_lbl)
+            self.can_fbm[spc_lbl].mpl_connect('button_press_event', self.my_call)
 
 # Trapped fraction
-        title = 'Trapped fast ion fraction'
-        self.fig_plot(trapframe, title, self.fbmr.frac_trap, zmin=0)
-
-# B-T
-        title = 'Beam-target neutrons'
-        self.fig_plot(btframe, title, btneut)
-
-# B-B
-        title = 'Beam-beam neutrons'
-        self.fig_plot(bbframe, title, bbneut)        
+            title = 'Trapped fast ion fraction %s' %spc_lbl
+            self.fig_plot(trapframe, title, self.fbmr.frac_trap[spc_lbl], zmin=0)
 
 # Plot 1st cell by default
-        self.plot_cell(0, logscale=True)
-
-        birth_file =  '%s_birth.cdf%s' %(self.fbm_file[:-9], t_id)
-        plot_birth.read_birth(birth_file, birthframe=self.birthframe)
+            self.plot_cell(0)
 
 
     def my_call(self, event):
 
         if event.button in (2,3):
-            thint=self.th_int.get()
-            volint=self.vol_int.get()
-            logscale=self.log_scale.get()
             dist2 = (self.fbmr.r2d - event.xdata)**2 + (self.fbmr.z2d - event.ydata)**2
             jcell = np.argmin(dist2)
-            if volint:
-                self.line1.set_data(self.fbmr.r2d, self.fbmr.z2d)
-            else:
-                if thint:
-                    ind=np.where(self.fbmr.x2d == self.fbmr.x2d[jcell])
-                    self.line1.set_data(self.fbmr.r2d[ind], self.fbmr.z2d[ind])
-                else:
-                    self.line1.set_data(self.fbmr.r2d[jcell], self.fbmr.z2d[jcell])
-
-            self.can_fbm.draw()
-            self.plot_cell(jcell,thint=thint,volint=volint,logscale=logscale)
+            self.plot_cell(jcell)
 
 
-    def plot_cell(self, jcell, volint=False, thint=False, logscale=False):
+    def plot_cell(self, jcell):
+
+        thint    = self.th_int.get()
+        volint   = self.vol_int.get()
+        logscale = self.log_scale.get()
 
 # "None" better then "0" for clarity in contour plot
 
         jrho = np.where(self.fbmr.rho_grid == self.fbmr.x2d[jcell])[0][0]
-
+        spc_lbl = self.species[self.nbdist.index('current')]
         if volint:
+            self.cell_mark[spc_lbl].set_data(self.fbmr.r2d, self.fbmr.z2d)
             tit_lbl = 'Volume averaged, t=%6.3f' %self.fbmr.time
-            zarr_lin = self.fbmr.dens_vol
+            zarr_lin = self.fbmr.dens_vol[spc_lbl]
         else:
             if thint:
+                ind=np.where(self.fbmr.x2d == self.fbmr.x2d[jcell])
+                self.cell_mark[spc_lbl].set_data(self.fbmr.r2d[ind], self.fbmr.z2d[ind])
                 tit_lbl = r'$\rho_{tor}$' + \
                           r' = %8.4f, $\theta$ averaged, t=%6.3f' %(self.fbmr.x2d[jcell], self.fbmr.time)
-                zarr_lin = self.fbmr.dens_zone[jrho]
+                zarr_lin = self.fbmr.dens_zone[spc_lbl][jrho]
             else:
-                tit_lbl = r'$\rho_{tor} = $ %8.4f $\theta = $%8.4f deg, t=%6.3f' \
+                self.cell_mark[spc_lbl].set_data(self.fbmr.r2d[jcell], self.fbmr.z2d[jcell])
+                tit_lbl = r'$\rho_{tor} = $ %8.4f $\theta = $%8.4f deg, t=%6.3f s' \
                           %(self.fbmr.x2d[jcell], np.degrees(self.fbmr.th2d[jcell]), self.fbmr.time)
-                zarr_lin = self.fbmr.fbm[jcell]
+                zarr_lin = self.fbmr.fdist[spc_lbl][jcell]
+        self.can_fbm[spc_lbl].draw()
 
         zmax_lin = np.max(zarr_lin[~np.isnan(zarr_lin)])
-        zmin_lin = 1e-4*zmax_lin
+        zmin_lin = 1e-6*zmax_lin
 #        flog_max = np.log10(zmax_lin)
 #        flog_min = np.log10(zmin_lin)
         flog_min = float(self.fmin.get())
@@ -365,14 +391,14 @@ class FBM:
         self.axcell.set_ylabel('Pitch angle' , fontsize=self.fsize)
         self.axcell.set_title(tit_lbl, fontsize=self.fsize)
 
-        ctr = self.axcell.contourf(1e-3*self.fbmr.e_d, self.fbmr.a_d, zarr, bounds)
+        ctr = self.axcell.contourf(1e-3*self.fbmr.e_d[spc_lbl], self.fbmr.a_d[spc_lbl], zarr, bounds)
         norm = mpl.colors.Normalize(vmin=zmin, vmax=zmax)
         cb_ax = self.fig_cell.add_axes([0.86, 0.05, 0.05, 0.91])
         mpl.colorbar.ColorbarBase(cb_ax,norm=norm,boundaries=bounds,ticks=bounds)
         self.axcell.plot([0, Emax], [0, 0], 'k-')
         if not volint and not thint:
-            self.axcell.plot([0, Emax], [ self.fbmr.trap_pit[jcell],  self.fbmr.trap_pit[jcell]], 'g-')
-            self.axcell.plot([0, Emax], [-self.fbmr.trap_pit[jcell], -self.fbmr.trap_pit[jcell]], 'g-')
+            self.axcell.plot([0, Emax], [ self.fbmr.trap_pit[spc_lbl][jcell],  self.fbmr.trap_pit[spc_lbl][jcell]], 'g-')
+            self.axcell.plot([0, Emax], [-self.fbmr.trap_pit[spc_lbl][jcell], -self.fbmr.trap_pit[spc_lbl][jcell]], 'g-')
 
         self.can_cell.draw()
 

@@ -188,7 +188,7 @@ class VIEWER:
                 self.dim[sig]  = self.cv[sig].dimensions
                 self.unit[sig] = self.cv[sig].units
                 self.nt = self.ynp[sig].shape[0]
-                if len(self.cv[sig].data.shape) > 1:
+                if self.cv[sig].data.ndim > 1:
                     self.prof_list.append(sig)
                 else:
                     self.trace_list.append(sig)
@@ -726,7 +726,7 @@ class VIEWER:
             unit_flag = (sunit == '') or (sunit in unit)
             desc_flag = (sdesc == '') or (sdesc in descr)
             if key_flag and unit_flag and desc_flag:
-                if len(val.data.shape) == dim or dim == 3:
+                if val.data.ndim == dim or dim == 3:
                     print key.ljust(10), unit.ljust(16), descr.ljust(20)
         print('')
 

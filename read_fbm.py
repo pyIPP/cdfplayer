@@ -15,14 +15,10 @@ class READ_FBM:
 
         cv = netcdf.netcdf_file(f_fbm, 'r', mmap=False).variables
 
-        spc_lbl = "".join(cv['SPECIES_1'].data)
-        print spc_lbl
+#-------------------------------
+# Read space-time grids from cdf
+#-------------------------------
 
-# Read data from cdf
-
-        self.fbm  = 0.5*cv['F_'+spc_lbl].data
-        self.a_d  = cv['A_'+spc_lbl].data
-        self.e_d  = cv['E_'+spc_lbl].data
         self.r2d  = cv['R2D'].data
         self.z2d  = cv['Z2D'].data
         self.x2d  = cv['X2D'].data
@@ -37,7 +33,7 @@ class READ_FBM:
         else:
             n_sym = 1
 
-        n_cells, n_pit, n_E = self.fbm.shape
+        n_cells = len(bmvol)
         n_zones = cv['N_ZONEROWS'].data
 
         rho_lab = np.zeros(n_cells, dtype=int)      # rho index, takes values 0:n_zones-1
@@ -62,46 +58,6 @@ class READ_FBM:
         rho_step = self.rho_grid[1] - self.rho_grid[0]
         rho_b[:n_zones] = self.rho_grid     - 0.5*rho_step
         rho_b[n_zones]  = self.rho_grid[-1] + 0.5*rho_step
-
-        dE = np.diff(cv['EB_%s' %spc_lbl].data)
-        dpa = np.diff(cv['AB_%s' %spc_lbl].data)
-        dpa_dE = np.outer(dpa, dE)
-
-# Passing vs trapped
-
-        fbm_pass = np.zeros((n_cells, n_E))
-        fbm_trap = np.zeros((n_cells, n_E))
-        self.trap_pit = 1. - rmaj_min[rho_lab[:]]/self.r2d[:]
-        for jcell in range(n_cells):
-            ind_trap = (self.a_d**2 <= self.trap_pit[jcell])
-            if ind_trap.any():
-                fbm_trap[jcell, :] = np.tensordot(self.fbm[jcell, ind_trap , :], dpa[ind_trap] , axes=(0, 0))
-            if (~ind_trap).any():
-                fbm_pass[jcell, :] = np.tensordot(self.fbm[jcell, ~ind_trap, :], dpa[~ind_trap], axes=(0, 0))
-
-# Integrals
-
-        self.int_en_pit = np.tensordot(self.fbm, dpa_dE, axes=((1, 2), (0, 1)))
-        int_en_pass = np.tensordot(fbm_pass, dE, axes=(1, 0))
-        int_en_trap = np.tensordot(fbm_trap, dE, axes=(1, 0))
-
-        self.dens_zone = np.zeros((n_zones, n_pit, n_E))
-        self.dens_vol  = np.tensordot(self.fbm, bmvol, axes=(0,0))/np.sum(bmvol)
-        vol_zone = np.zeros(n_zones)
-        for jrho in range(n_zones):
-            indrho = (rho_lab == jrho)
-            vol_zone[jrho] = np.sum(bmvol[indrho])
-            self.dens_zone[jrho, :, :] = np.tensordot(self.fbm[indrho, :, :], bmvol[indrho], axes = (0, 0))
-            self.dens_zone[jrho, :, :] *= 1/vol_zone[jrho]
-
-        self.bdens = np.tensordot(self.dens_zone, dpa_dE, axes=((1, 2), (0, 1)))
-
-        part_tot = np.sum(self.bdens*vol_zone)
-        pass_tot = np.sum(int_en_pass*bmvol)
-        trap_tot = np.sum(int_en_trap*bmvol)
-        print('Passing #%12.4e  Trapped #%12.4e    Total #%12.4e' %(pass_tot, trap_tot, part_tot))
-        print('Volume averaged fast ion density #12.4e m^-3' %(part_tot/vol))
-        self.frac_trap = int_en_trap/(int_en_pass + int_en_trap)
 
 # Rsurf, zsurf only of NUBEAM zones
 
@@ -132,3 +88,73 @@ class READ_FBM:
                 zbar[1] = np.interp(ythe, th_ref, self.zsurf[jrho+1, ind])
                 self.rbar.append(rbar)
                 self.zbar.append(zbar)
+
+#-----------------------------------------------
+# Read distribution, energy, pitch data from cdf
+#-----------------------------------------------
+
+        spec_lab = [] 
+        for j in range(10):
+            lbl = 'SPECIES_%d' %j
+            if lbl in cv.keys():
+                slbl = "".join(cv[lbl].data)
+                spec_lab.append(slbl)
+
+        self.fdist  = {}
+        self.a_d    = {}
+        self.e_d    = {}
+        self.bdens  = {}
+        self.trap_pit   = {}
+        self.int_en_pit = {}
+        self.dens_zone  = {}
+        self.dens_vol   = {}
+        self.frac_trap  = {}
+
+        for spc_lbl in spec_lab:
+
+            self.fdist[spc_lbl] = 0.5*cv['F_%s' %spc_lbl].data
+            self.a_d[spc_lbl]   =     cv['A_%s' %spc_lbl].data
+            self.e_d[spc_lbl]   =     cv['E_%s' %spc_lbl].data
+            fbm = self.fdist[spc_lbl]
+            dE = np.diff(cv['EB_%s' %spc_lbl].data)
+            dpa = np.diff(cv['AB_%s' %spc_lbl].data)
+
+            n_cells, n_pit, n_E = fbm.shape
+
+            dpa_dE = np.outer(dpa, dE)
+
+# Passing vs trapped
+
+            fbm_pass = np.zeros((n_cells, n_E))
+            fbm_trap = np.zeros((n_cells, n_E))
+            self.trap_pit[spc_lbl] = 1. - rmaj_min[rho_lab[:]]/self.r2d[:]
+            for jcell in range(n_cells):
+                ind_trap = (self.a_d[spc_lbl]**2 <= self.trap_pit[spc_lbl][jcell])
+                if ind_trap.any():
+                    fbm_trap[jcell, :] = np.tensordot(fbm[jcell, ind_trap , :], dpa[ind_trap] , axes=(0, 0))
+                if (~ind_trap).any():
+                    fbm_pass[jcell, :] = np.tensordot(fbm[jcell, ~ind_trap, :], dpa[~ind_trap], axes=(0, 0))
+
+# Integrals
+
+            self.int_en_pit[spc_lbl] = np.tensordot(fbm, dpa_dE, axes=((1, 2), (0, 1)))
+            int_en_pass = np.tensordot(fbm_pass, dE, axes=(1, 0))
+            int_en_trap = np.tensordot(fbm_trap, dE, axes=(1, 0))
+
+            self.dens_zone[spc_lbl] = np.zeros((n_zones, n_pit, n_E))
+            self.dens_vol[spc_lbl]  = np.tensordot(fbm, bmvol, axes=(0,0))/np.sum(bmvol)
+            vol_zone = np.zeros(n_zones)
+            for jrho in range(n_zones):
+                indrho = (rho_lab == jrho)
+                vol_zone[jrho] = np.sum(bmvol[indrho])
+                self.dens_zone[spc_lbl][jrho, :, :] = np.tensordot(fbm[indrho, :, :], bmvol[indrho], axes = (0, 0))
+                self.dens_zone[spc_lbl][jrho, :, :] *= 1/vol_zone[jrho]
+
+            self.bdens[spc_lbl] = np.tensordot(self.dens_zone[spc_lbl], dpa_dE, axes=((1, 2), (0, 1)))
+
+            part_tot = np.sum(self.bdens[spc_lbl]*vol_zone)
+            pass_tot = np.sum(int_en_pass*bmvol)
+            trap_tot = np.sum(int_en_trap*bmvol)
+            print('Passing #%12.4e  Trapped #%12.4e    Total #%12.4e' %(pass_tot, trap_tot, part_tot))
+            print('Volume averaged fast ion density #12.4e m^-3' %(part_tot/vol))
+            self.frac_trap[spc_lbl] = int_en_trap/(int_en_pass + int_en_trap)

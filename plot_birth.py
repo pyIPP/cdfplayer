@@ -10,7 +10,7 @@ import plot_sections, read_fbm
 from tkMessageBox import *
 
 
-def read_birth(birth_file, birthframe=None):
+def read_birth(birth_file, topframe=None):
 
 
     print('Reading %s' %birth_file)
@@ -65,11 +65,12 @@ def read_birth(birth_file, birthframe=None):
 
 # Vessel compoments for plot
 
-    try:
+#    try:
+    if True:
         import plot_aug
         xlin, ylin, rlin, zlin = plot_aug.nbi_plot(nbis=src_arr, runid=runid, raug=False)
-    except:
-        pass
+#    except:
+#        pass
 
     Efull = {}
     for jsrc in src_arr:
@@ -152,11 +153,11 @@ def read_birth(birth_file, birthframe=None):
 
 # One tab for each source
 
-    if birthframe is None:
-        birthframe = tk.Toplevel()
-        birthframe.title('Birth location')
-        birthframe.geometry('1500x940')
-    nbsource = ttk.Notebook(birthframe, name='nb source')
+    if topframe is None:
+        topframe = tk.Toplevel()
+        topframe.title('Birth location')
+        topframe.geometry('1500x940')
+    nbsource = ttk.Notebook(topframe, name='nb source')
     nbsource.pack(side=tk.TOP, fill=tk.X)
 
     for j, jsrc in enumerate(src_arr):
@@ -334,5 +335,5 @@ if __name__ == "__main__":
     birth_tk = tk.Tk()
     birth_tk.title('Birth location')
     birth_tk.geometry('1500x940')
-    read_birth(fbirth, birthframe=birth_tk)
+    read_birth(fbirth, topframe=birth_tk)
     birth_tk.mainloop()

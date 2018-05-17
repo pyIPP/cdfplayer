@@ -32,6 +32,8 @@ class VIEWER:
         self.cdf_file  = f_cdf_in
         self.list_file = list_file
 
+        self.jtab = 0
+
 # Widget frame
 
         print('Setting GUI frame')
@@ -156,7 +158,7 @@ class VIEWER:
     def on_click(self, event):
         if event.widget.identify(event.x, event.y) == 'label':
             self.jtab = event.widget.index('@%d,%d' % (event.x, event.y))
-        self.replot()
+        self.update_plot()
 
 
     def read(self, f_cdf):
@@ -165,33 +167,39 @@ class VIEWER:
             print('NetCDF file %s not found' %f_cdf)
             return
 
+        if hasattr(self, 'surf'):
+            del self.surf
         print('Reading profiles from %s' %f_cdf)
         self.cv = netcdf.netcdf_file(f_cdf, 'r', mmap=False).variables
-        for key, val in self.cv.iteritems():
-            if key == 'rho':
-                print key, val
-                if key == 'Ts':
-                    print key, val[0, :], val
 
-        print 'Reading equilibrium from '+f_cdf
+        print('Reading equilibrium from %s' %f_cdf)
         rho = np.linspace(0.1, 1.0, 10)
-        self.surf = read_equ.READ_EQU(f_cdf, rho=rho)
+        if 'TIME3' in self.cv.keys():
+            self.surf = read_equ.READ_EQU(f_cdf, rho=rho)
 
 
     def set_plots(self, pr_list=None):
 
-        if os.path.isfile(self.list_file) and pr_list == None:
+        self.mark1d  = {}
+        self.equline = {}
+        self.line1d  = {}
+        self.line2d  = {}
+
+        if os.path.isfile(self.list_file) and pr_list is None:
             f = open(self.list_file)
             pr_list = [s.strip() for s in f.readlines()]
             f.close()
             print('Using profile list from file %s' %self.list_file)
-        elif pr_list == None:
+        elif pr_list is None:
             pr_list = ['CUR', 'TE', 'NE', 'V', 'BPOL', 'NEUTT', 'NIMP', 'PINJ', 'TAUEA']
  
-        self.time = self.cv['TIME3'].data
-        self.rho  = self.cv['X'][0, :]
-        self.rhob = self.cv['XB'][0, :]
-        self.ynp  = {}
+        if 'TIME3' in self.cv.keys():
+            self.time = self.cv['TIME3'].data
+            self.rho  = self.cv['X'][0, :]
+            self.rhob = self.cv['XB'][0, :]
+        else: 
+            self.time = self.cv['TIME'].data
+            self.rho  = self.cv['XRHO'].data
         self.lbl  = {}
         self.dim  = {}
         self.unit = {}
@@ -199,13 +207,12 @@ class VIEWER:
         self.trace_list = []
         for sig in pr_list:
             sig = sig.upper()
-            if sig in self.cv.iterkeys():
-                self.ynp[sig]  = self.cv[sig].data
+            if sig in self.cv.keys():
                 self.lbl[sig]  = self.cv[sig].long_name[:-2]
                 self.dim[sig]  = self.cv[sig].dimensions
                 self.unit[sig] = self.cv[sig].units
-                self.nt = self.ynp[sig].shape[0]
-                if len(self.cv[sig].data.shape) > 1:
+                self.nt = self.cv[sig].data.shape[0]
+                if self.cv[sig].data.ndim > 1:
                     self.prof_list.append(sig)
                 else:
                     self.trace_list.append(sig)
@@ -213,28 +220,26 @@ class VIEWER:
                 print('No variable %s in CDF file, ignoring!' %sig)
 
         if len(self.trace_list) > 15:
-            print('Too many time traces, taking only the first 15'
+            print('Too many time traces, taking only the first 15')
             self.trace_list = self.trace_list[:15]
         if len(self.prof_list) > 15:
-            print('Too many profiles, taking only the first 15'
+            print('Too many profiles, taking only the first 15')
             self.prof_list = self.prof_list[:15]
         nrow = 3
         ncol = 5
 
 # Equilibrium
 
-        npoints = 201
-        Rin, Zin = mom2rz.mom2rz(self.surf.rc, \
-            self.surf.rs, self.surf.zc, self.surf.zs, nthe=npoints)
-
-        nt, self.n_rho, npoints = Rin.shape
-        self.R = np.zeros((nt, self.n_rho, npoints+1))
-        self.Z = np.zeros((nt, self.n_rho, npoints+1))
-        self.R[:, :, :-1] = Rin
-        self.Z[:, :, :-1] = Zin
-        self.R[:, :, -1] = self.R[:, :, 0]
-        self.Z[:, :, -1] = self.Z[:, :, 0]
-
+        if hasattr(self, 'surf'):
+            npoints = 201
+            self.R, self.Z = mom2rz.mom2rz(self.surf.rc, \
+                self.surf.rs, self.surf.zc, self.surf.zs, nthe=npoints, endpoint=True)
+        else:
+            self.R = self.cv['Rsurf'].data
+            self.Z = self.cv['Zsurf'].data
+        self.n_rho = self.R.shape[1]
+        print('Nrho_eq = %d' %self.n_rho)
+        print(self.R.shape)
 # Plots
 
         fsize = 12
@@ -252,16 +257,19 @@ class VIEWER:
 
         ax_eq = self.fig_eq.add_subplot(1, 1, 1, aspect='equal')
         for jrho in range(self.n_rho):
-            self.equline[jrho],  = ax_eq.plot(self.R[self.jt, jrho, :], self.Z[self.jt, jrho, :], 'g-')
-        self.equline['axis'], = ax_eq.plot(self.surf.r_mag[self.jt], self.surf.z_mag[self.jt], 'g+')
+            self.equline[jrho],  = ax_eq.plot([], [], 'g-')
+        self.equline['axis'], = ax_eq.plot([], [], 'g+')
         ax_eq.set_xlabel('R [cm]', fontsize=fsize)
         ax_eq.set_ylabel('z [cm]', fontsize=fsize)
 
 # Plot AUG structures
-        nshot = int(self.runid[0:5])
+#        nshot = int(self.runid[0:5])
         try:
             import plot_aug
-            plot_aug.vessel_pol(ax_eq, fac=100.)
+            if hasattr(self, 'surf'):
+                plot_aug.vessel_pol(ax_eq, fac=100.)
+            else:
+                plot_aug.vessel_pol(ax_eq, fac=1.)
         except:
             pass
 
@@ -272,9 +280,9 @@ class VIEWER:
             ax_1d = self.fig_1d.add_subplot(nrow, ncol, jplot)
             ax_1d.set_xlabel('t [s]', fontsize=fsize)
             ax_1d.set_ylabel(ylab, fontsize=fsize)
-            self.line1d[trace], = ax_1d.plot(self.time, self.ynp[trace][:], 'b-')
+            self.line1d[trace], = ax_1d.plot(self.time, self.cv[trace][:], 'b-')
             ax_1d.grid('on')
-            self.mark1d[trace], = ax_1d.plot(self.time[0], self.ynp[trace][0], 'go')
+            self.mark1d[trace], = ax_1d.plot(self.time[0], self.cv[trace][0], 'go')
             jplot += 1
             ax_1d.ticklabel_format(axis='y', style='sci', scilimits=(-4,-4))
             ax_1d.yaxis.major.formatter._useMathText = True
@@ -284,28 +292,26 @@ class VIEWER:
             if 'X' in self.dim[prof]:
                 xrho = self.rho
                 xlab = r'$\rho_{tor}$(X)'
-            if 'XB' in self.dim[prof]:
+            elif 'XB' in self.dim[prof]:
                 xrho = self.rhob
                 xlab = r'$\rho_{tor}$(XB)'
+            elif 'XRHO' in self.dim[prof]:
+                xrho = self.rho
+                xlab = r'$\rho_{tor}$(XRHO)'
             ylab = '%s [%s]' %(prof, self.unit[prof].strip())
 
             ax_2d = self.fig_2d.add_subplot(nrow, ncol, jplot)
             ax_2d.set_xlim([0, 1.])
-            ax_2d.set_ylim([0, 1.1*np.max(self.ynp[prof])])
+            ax_2d.set_ylim([0, 1.1*np.max(self.cv[prof].data)])
             ax_2d.set_xlabel(xlab, fontsize=fsize)
             ax_2d.set_ylabel(ylab, fontsize=fsize)
-            self.line2d[prof], = ax_2d.plot(xrho, self.ynp[prof][0, :], 'b-')
+            self.line2d[prof], = ax_2d.plot(xrho, self.cv[prof][0, :], 'b-')
             ax_2d.grid('on')
             ax_2d.ticklabel_format(axis='y', style='sci', scilimits=(-4,-4))
             ax_2d.yaxis.major.formatter._useMathText = True
             jplot += 1
 
-        self.canv_eq.draw()
-        self.canv_1d.draw()
-        self.canv_2d.draw()
-        self.jtab = 0
-
-        self.replot()
+        self.update_plot()
 
 
     def eqdisk(self):
@@ -385,7 +391,7 @@ class VIEWER:
             dlbl = trace.ljust(20) + self.unit[trace].strip()
             uf_d = { 'pre':'A', 'ext':trace, 'shot':sshot, \
                      'grid': {'X': {'lbl':tlbl, 'arr':self.time} }, \
-                     'data': {'lbl':dlbl, 'arr':self.ynp[trace][:]} }
+                     'data': {'lbl': dlbl, 'arr': self.cv[trace][:]} }
             ufiles.WU(uf_d)
 
 
@@ -397,11 +403,15 @@ class VIEWER:
         sshot = self.runid[0:5]
         xlbl = 'rho_tor'
         for prof in self.prof_list:
+            if 'XB' in self.dim[prof]:
+                xrho = self.rhob
+            else:
+                xrho = self.rho
             dlbl = prof.ljust(20) + self.unit[prof].strip()
-            uf_d = { 'pre':'A', 'ext':prof, 'shot':sshot, \
+            uf_d = { 'pre': 'A', 'ext': prof, 'shot': sshot, \
                      'scal': [['Time:'.ljust(20) + 's', self.time[self.jt]]], 
-                     'grid': {'X': {'lbl':xlbl, 'arr':self.rho} }, \
-                     'data': {'lbl':dlbl, 'arr':self.ynp[prof][self.jt, :]} }
+                     'grid': {'X': {'lbl': xlbl, 'arr': xrho} }, \
+                     'data': {'lbl': dlbl, 'arr': self.cv[prof][self.jt, :]} }
             ufiles.WU(uf_d)
 
 
@@ -414,36 +424,28 @@ class VIEWER:
         tlbl = 'Time'.ljust(20) + 'Seconds'
         xlbl = 'rho_tor'
         for prof in self.prof_list:
+            if 'XB' in self.dim[prof]:
+                xrho = self.rhob
+            else:
+                xrho = self.rho
             dlbl = prof.ljust(20) + self.unit[prof].rstrip()
-            uf_d = { 'pre':'A', 'ext':prof + '2', 'shot':sshot, \
-                     'grid': {'X':{'lbl':tlbl, 'arr':self.time}, \
-                              'Y':{'lbl':xlbl, 'arr':self.rho} }, \
-                     'data': {'lbl':dlbl, 'arr':self.ynp[prof]} }
+            uf_d = { 'pre': 'A', 'ext': prof + '2', 'shot': sshot, \
+                     'grid': {'X':{'lbl': tlbl, 'arr': self.time}, \
+                              'Y':{'lbl': xlbl, 'arr': xrho} }, \
+                     'data': {'lbl': dlbl, 'arr': self.cv[prof].data} }
             ufiles.WU(uf_d)
 
 
     def cdf2tre(self):
 
-        homdir = os.getenv('HOME')
-        os.system('mkdir -p %s/shotfiles/TRE' %homdir)
-        fsfh = '%s/tr_client/AUGD/TRE00000.sfh' %homdir
-        source = '/afs/ipp/home/t/transp/pub/TRE00000.sfh.temp'
-        if not os.path.isfile(self.cdf_file):
-            print('%s not found' %self.cdf_file)
-            return
-        try:
-            shutil.copy2(source, fsfh)
-        except IOError, e:
-            print('Unable to copy file %s\n%s' %(source, e))
-
         import cdf2sf
-        cdf2sf.CDF2TRE(self.cdf_file, sfh_tre=fsfh, vplot=True)
+        cdf2sf.cdf2tre(self.runid)
 
 
     def tr2sf(self):
 
         import cdf2sf
-        cdf2sf.CDF2TRA(self.runid)
+        cdf2sf.cdf2tra(self.runid)
 
 
     def smov(self):
@@ -456,7 +458,7 @@ class VIEWER:
         fmt = '%' + str(order) + 'd'
         for jtim in range(self.nt):
             self.jt = jtim
-            self.replot()
+            self.update_plot()
             jstr = (fmt % self.jt).replace(' ', '0')
             fout = '%s-%s.png' %(self.runid, jstr)
             print('Stored %s' %fout)
@@ -483,7 +485,7 @@ class VIEWER:
         print('Stored movie %s' %out_mov)
 
 
-    def replot(self, reset=True):
+    def update_plot(self, reset=True):
 
 #        if hasattr(self, 'crntsc') and reset:
         if reset:
@@ -492,21 +494,22 @@ class VIEWER:
         strtim = 't =%6.3f s' %self.time[self.jt]
         if self.jtab == 0:
             for jrho in range(self.n_rho):
-                self.equline [jrho].set_data(self.R[self.jt, jrho, :], self.Z[self.jt, jrho, :])
+                self.equline[jrho].set_data(self.R[self.jt, jrho, :], self.Z[self.jt, jrho, :])
             self.txt_eq.set_text(strtim)
 # Plot mag. axis:
-            self.equline['axis'].set_data(self.surf.r_mag[self.jt], self.surf.z_mag[self.jt])
+            if hasattr(self, 'surf'):
+                self.equline['axis'].set_data(self.surf.r_mag[self.jt], self.surf.z_mag[self.jt])
             self.canv_eq.draw()
             
         elif self.jtab == 1:
             for trace in self.trace_list:
-                self.mark1d[trace].set_data(self.time[self.jt], self.ynp[trace][self.jt])
+                self.mark1d[trace].set_data(self.time[self.jt], self.cv[trace][self.jt])
             self.txt_1d.set_text(strtim)
             self.canv_1d.draw()
 
         elif self.jtab == 2:
             for prof in self.prof_list:
-                self.line2d[prof].set_ydata(self.ynp[prof][self.jt, :])
+                self.line2d[prof].set_ydata(self.cv[prof][self.jt, :])
             self.txt_2d.set_text(strtim)
             self.canv_2d.draw()
 
@@ -518,7 +521,7 @@ class VIEWER:
         if self.jt > 0:
             self.jt -= 1
             self.inNextOrPrev = True
-            self.replot()
+            self.update_plot()
             self.inNextOrPrev = False
 
 
@@ -529,7 +532,7 @@ class VIEWER:
         if self.jt < self.nt - 1:
             self.jt += 1
             self.inNextOrPrev = True
-            self.replot()
+            self.update_plot()
             self.inNextOrPrev = False
 
 
@@ -538,7 +541,7 @@ class VIEWER:
         if self.inNextOrPrev:
             return
         self.jt = int(float(arg)/100. * (self.nt-1))
-        self.replot(reset=False)
+        self.update_plot(reset=False)
 
 
     def pause(self):
@@ -547,7 +550,7 @@ class VIEWER:
         self.rw = False
         self.playbt['image']   = self.playfig
         self.playbt['command'] = self.play
-        self.replot()
+        self.update_plot()
 
 
     def play(self):
@@ -558,7 +561,7 @@ class VIEWER:
         self.playbt['command'] = self.pause
         while self.ff and self.jt < self.nt - 1:
             self.jt += 1
-            self.replot()
+            self.update_plot()
             self.canv_eq.start_event_loop(self.timeout)
 
 
@@ -568,7 +571,7 @@ class VIEWER:
         self.rw = True
         while self.rw and self.jt > 0:
             self.jt -= 1
-            self.replot()
+            self.update_plot()
             self.canv_eq.start_event_loop(self.timeout)
 
 
@@ -582,11 +585,6 @@ class VIEWER:
     def callset(self):
 
         self.list_file = askopenfilename(initialdir=self.dir_set, filetypes=[("All formats", "*.txt")])
-        self.jt = 0
-        self.equline  = {}
-        self.mark1d = {}
-        self.line1d = {}
-        self.line2d = {}
         self.set_plots()
 
 
@@ -604,54 +602,42 @@ class VIEWER:
 
     def editlist(self, profiles=None):
 
+        sig_list = self.prof_list + self.trace_list
+        self.topl = tk.Toplevel(self.viewframe)
+        self.topl.resizable(0, 0)
+        tk.Label(self.topl, text="Profiles to be viewed").grid(row=0, columnspan=3)
+        self.txt = tk.Text(self.topl, width=40, height=10)
+        self.txt.grid(row=1, columnspan=2)
+        self.txt.insert('end', "\n".join(sig_list if profiles is None else profiles))
+        scr = tk.Scrollbar(self.topl)
+        scr.config(command=self.txt.yview)
+        scr.grid(row=1, column=2, sticky=tk.N+tk.S)
+        self.txt.config(yscrollcommand=scr.set)
+        b = tk.Button(self.topl, text="OK", command=self.dialog_ok)
+        b.grid(row=2, column=0)
+        b = tk.Button(self.topl, text="Cancel", command=self.topl.destroy)
+        b.grid(row=2, column=1)
 
-        class ProfilesDialog(object):
 
-            def __init__(self, parent, viewer, profiles=None):
-                self.viewer = viewer
-                sig_list = self.viewer.prof_list + self.viewer.trace_list
-                top = self.top = tk.Toplevel(parent)
-                top.resizable(0, 0)
-                tk.Label(top, text="Profiles to be viewed").grid(row=0, columnspan=3)
-                self.t = tk.Text(top, width=40, height=10)
-                self.t.grid(row=1, columnspan=2)
-                self.t.insert('end', "\n".join(sig_list if profiles==None else profiles))
-                scr = tk.Scrollbar(top)
-                scr.config(command=self.t.yview)
-                scr.grid(row=1, column=2, sticky=tk.N+tk.S)
-                self.t.config(yscrollcommand=scr.set)
-                b = tk.Button(top, text="OK", command=self.ok)
-                b.grid(row=2, column=0)
-                b = tk.Button(top, text="Cancel", command=self.top.destroy)
-                b.grid(row=2, column=1)
+    def dialog_ok(self):
 
-            def ok(self):
-                newsigs = self.t.get("0.0", "end-1c").split()
-                oldprofiles = self.viewer.prof_list
-                oldtraces   = self.viewer.trace_list
-                try:
-                    self.viewer.jt = 0
-                    self.viewer.equline = {}
-                    self.viewer.line1d = {}
-                    self.viewer.line2d = {}
-                    self.viewer.set_plots(pr_list=newsigs)
-                    self.top.destroy()
-                except Exception, e:
-                    tkMessageBox.showerror('Error', 'This went wrong: %s'%repr(e))
-                    self.viewer.prof_list  = oldprofiles
-                    self.viewer.trace_list = oldtraces
-
-        dialog = ProfilesDialog(self.viewframe, self, profiles=profiles)
+        newsigs = self.txt.get("0.0", "end-1c").split()
+        oldprofiles = self.prof_list
+        oldtraces   = self.trace_list
+        try:
+            self.set_plots(pr_list=newsigs)
+        except Exception, e:
+            print('Error!')
+            tkMessageBox.showerror('Error', 'This went wrong: %s'%repr(e))
+            self.prof_list  = oldprofiles
+            self.trace_list = oldtraces
+        self.topl.destroy()
 
 
     def load(self):
 
         self.jt = 0
         self.runid = self.cdf_file[-12:-4]
-        self.equline  = {}
-        self.mark1d = {}
-        self.line1d = {}
-        self.line2d = {}
         self.read(self.cdf_file)
         self.set_plots()
 
@@ -697,15 +683,15 @@ class VIEWER:
         sunit = self.disp_d['Unit'].get().upper().strip()
         sdesc = self.disp_d['Description'].get().upper().strip()
         dim = self.disp_d['dim'].get()
-        for key, val in self.cv.iteritems():
+        for key, val in self.cv.items():
             unit  = val.units.strip()
             descr = val.long_name.strip()
             key_flag  = (skey  == '') or (skey  in key)
             unit_flag = (sunit == '') or (sunit in unit)
             desc_flag = (sdesc == '') or (sdesc in descr)
             if key_flag and unit_flag and desc_flag:
-                if len(val.data.shape) == dim or dim == 3:
-                    print key.ljust(10), unit.ljust(16), descr.ljust(20)
+                if val.data.ndim == dim or dim == 3:
+                    print(key.ljust(10), unit.ljust(16), descr.ljust(20))
         print('')
 
 
@@ -717,7 +703,6 @@ if __name__ == "__main__":
 
     if len(sys.argv) > 2:
         f = sys.argv[2]
-        print f
         if f in ('-h', '--help', '-?'):
             print('Usage: cdfplayer [<cdf file> [<profile list file>]]')
             sys.exit()
@@ -735,5 +720,4 @@ if __name__ == "__main__":
                 f_path = os.getenv('HOME') + '/python/cdfp/' + f
                 if os.path.isfile(f_path):
                     list_file = f_path
-
     VIEWER(cdf_file, list_file=list_file)

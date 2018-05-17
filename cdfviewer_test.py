@@ -6,17 +6,11 @@ from tkFileDialog import askopenfilename, asksaveasfile
 import tkMessageBox
 
 import numpy as np
-import ufiles, read_equ, mom2rz, tkhyper, rz2psi, tr_path
+import ufiles, read_equ, mom2rz, tkhyper, rz2psi
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 from matplotlib.figure import Figure
 import matplotlib.pylab as plt
 from scipy.io import netcdf
-
-
-nxcol = '#50c050'
-qtcol = '#f00000'
-svcol = '#a0a0d0'
-encol = '#dddddd'
 
 
 class VIEWER:
@@ -50,18 +44,15 @@ class VIEWER:
         menubar = tk.Menu(self.viewframe)
 
         filemenu = tk.Menu(menubar, tearoff=0)
-        filemenu.add_command(label="Play"       , command=self.play)
         filemenu.add_command(label="Load run...", command=self.callcdf)
+        filemenu.add_command(label="Display variables...", command=self.display_vars)
         filemenu.add_separator()
         filemenu.add_command(label="Exit", command=sys.exit)
 
         editmenu = tk.Menu(menubar, tearoff=0)
-        editmenu.add_command(label="Load setup...", command=self.callback)
+        editmenu.add_command(label="Load setup...", command=self.callset)
         editmenu.add_command(label="Save setup...", command=self.callsave)
         editmenu.add_command(label="Edit setup...", command=self.editlist)
-
-        dispmenu = tk.Menu(menubar, tearoff=0)
-        dispmenu.add_command(label="Display variables...", command=self.display_vars)
 
         savemenu = tk.Menu(menubar, tearoff=0)
         savemenu.add_command(label="Save 1D u-file(t)"          , command=self.uf1t)
@@ -78,7 +69,6 @@ class VIEWER:
 
         menubar.add_cascade(label="File"  ,  menu=filemenu)
         menubar.add_cascade(label="Setup" ,  menu=editmenu)
-        menubar.add_cascade(label="Display", menu=dispmenu)
         menubar.add_cascade(label="Output",  menu=savemenu)
         menubar.add_cascade(label="Help"  ,  menu=helpmenu)
 
@@ -111,9 +101,11 @@ class VIEWER:
         self.fig_eq = Figure(figsize=(14., 8.5), dpi=100)
         self.fig_1d = Figure(figsize=(14., 8.5), dpi=100)
         self.fig_2d = Figure(figsize=(14., 8.5), dpi=100)
-        self.fig_eq.subplots_adjust(left=0.01, bottom=0.1, right=0.95, top=0.94)
-        self.fig_1d.subplots_adjust(left=0.01, bottom=0.1, right=0.95, top=0.94, wspace=0.15)
-        self.fig_2d.subplots_adjust(left=0.05, bottom=0.1, right=0.97, top=0.94, wspace=0.25)
+        self.fig_eq.subplots_adjust(left=0.01, bottom=0.1, right=0.95, top=0.95)
+        self.fig_1d.subplots_adjust(left=0.05, bottom=0.1, right=0.97, top=0.92, \
+            wspace=0.3, hspace=0.3)
+        self.fig_2d.subplots_adjust(left=0.05, bottom=0.1, right=0.97, top=0.92, \
+            wspace=0.3, hspace=0.3)
         self.canv_eq = FigureCanvasTkAgg(self.fig_eq, master=frame_eq)
         self.canv_1d = FigureCanvasTkAgg(self.fig_1d, master=frame_1d)
         self.canv_2d = FigureCanvasTkAgg(self.fig_2d, master=frame_2d)
@@ -194,7 +186,7 @@ class VIEWER:
             f.close()
             print('Using profile list from file %s' %self.list_file)
         elif pr_list == None:
-            pr_list = ['CUR', 'TE', 'NE', 'V', 'BPOL', 'NEUTT']
+            pr_list = ['CUR', 'TE', 'NE', 'V', 'BPOL', 'NEUTT', 'NIMP', 'PINJ', 'TAUEA']
  
         self.time = self.cv['TIME3'].data
         self.rho  = self.cv['X'][0, :]
@@ -213,14 +205,19 @@ class VIEWER:
                 self.dim[sig]  = self.cv[sig].dimensions
                 self.unit[sig] = self.cv[sig].units
                 self.nt = self.ynp[sig].shape[0]
-                if len(self.cv[sig].data.shape) > 1:
+                if self.cv[sig].data.ndim > 1:
                     self.prof_list.append(sig)
                 else:
                     self.trace_list.append(sig)
             else:
-                print('%s not in CDF variables, dropping!' %sig)
+                print('No variable %s in CDF file, ignoring!' %sig)
 
-        nprof = max(len(self.prof_list), len(self.trace_list))
+        if len(self.trace_list) > 15:
+            print('Too many time traces, taking only the first 15'
+            self.trace_list = self.trace_list[:15]
+        if len(self.prof_list) > 15:
+            print('Too many profiles, taking only the first 15'
+            self.prof_list = self.prof_list[:15]
         nrow = 3
         ncol = 5
 
@@ -246,17 +243,19 @@ class VIEWER:
         self.fig_1d.clf()
         self.fig_2d.clf()
 
-        self.fig_eq.text(0.5, 0.98, self.runid, ha='center', va='top')
-        self.fig_1d.text(0.5, 0.98, self.runid, ha='center', va='top')
-        self.fig_2d.text(0.5, 0.98, self.runid, ha='center', va='top')
-        self.txt_eq = self.fig_eq.text(0.5, 0.96, '', ha='center', va='top')
-        self.txt_1d = self.fig_1d.text(0.5, 0.96, '', ha='center', va='top')
-        self.txt_2d = self.fig_2d.text(0.5, 0.96, '', ha='center', va='top')
+        self.fig_eq.text(0.5, 0.99, self.runid, ha='center', va='top')
+        self.fig_1d.text(0.5, 0.99, self.runid, ha='center', va='top')
+        self.fig_2d.text(0.5, 0.99, self.runid, ha='center', va='top')
+        self.txt_eq = self.fig_eq.text(0.5, 0.97, '', ha='center', va='top')
+        self.txt_1d = self.fig_1d.text(0.5, 0.97, '', ha='center', va='top')
+        self.txt_2d = self.fig_2d.text(0.5, 0.97, '', ha='center', va='top')
 
         ax_eq = self.fig_eq.add_subplot(1, 1, 1, aspect='equal')
         for jrho in range(self.n_rho):
             self.equline[jrho],  = ax_eq.plot(self.R[self.jt, jrho, :], self.Z[self.jt, jrho, :], 'g-')
         self.equline['axis'], = ax_eq.plot(self.surf.r_mag[self.jt], self.surf.z_mag[self.jt], 'g+')
+        ax_eq.set_xlabel('R [cm]', fontsize=fsize)
+        ax_eq.set_ylabel('z [cm]', fontsize=fsize)
 
 # Plot AUG structures
         nshot = int(self.runid[0:5])
@@ -268,10 +267,7 @@ class VIEWER:
 
         jplot = 1
         for trace in self.trace_list:
-            unit = ' [%s]' %self.unit[trace].strip()
-            if unit.strip() == '[]':
-                unit = ''
-            ylab = trace + unit
+            ylab = '%s [%s]' %(trace, self.unit[trace].strip())
 
             ax_1d = self.fig_1d.add_subplot(nrow, ncol, jplot)
             ax_1d.set_xlabel('t [s]', fontsize=fsize)
@@ -280,6 +276,8 @@ class VIEWER:
             ax_1d.grid('on')
             self.mark1d[trace], = ax_1d.plot(self.time[0], self.ynp[trace][0], 'go')
             jplot += 1
+            ax_1d.ticklabel_format(axis='y', style='sci', scilimits=(-4,-4))
+            ax_1d.yaxis.major.formatter._useMathText = True
 
         jplot = 1
         for prof in self.prof_list:
@@ -289,10 +287,7 @@ class VIEWER:
             if 'XB' in self.dim[prof]:
                 xrho = self.rhob
                 xlab = r'$\rho_{tor}$(XB)'
-            unit = ' [%s]' %self.unit[prof].strip()
-            if unit.strip() == '[]':
-                unit = ''
-            ylab = prof + unit
+            ylab = '%s [%s]' %(prof, self.unit[prof].strip())
 
             ax_2d = self.fig_2d.add_subplot(nrow, ncol, jplot)
             ax_2d.set_xlim([0, 1.])
@@ -301,6 +296,8 @@ class VIEWER:
             ax_2d.set_ylabel(ylab, fontsize=fsize)
             self.line2d[prof], = ax_2d.plot(xrho, self.ynp[prof][0, :], 'b-')
             ax_2d.grid('on')
+            ax_2d.ticklabel_format(axis='y', style='sci', scilimits=(-4,-4))
+            ax_2d.yaxis.major.formatter._useMathText = True
             jplot += 1
 
         self.canv_eq.draw()
@@ -577,12 +574,12 @@ class VIEWER:
 
     def callcdf(self):
 
-        dir_in = os.getenv('HOME') + '/tr_client/AUGD'
+        dir_in = '%s/tr_client/%s' %(os.getenv('HOME'), self.tok)
         self.cdf_file = askopenfilename(initialdir=dir_in, filetypes=[("All formats", "*.CDF")])
         self.load()
 
 
-    def callback(self):
+    def callset(self):
 
         self.list_file = askopenfilename(initialdir=self.dir_set, filetypes=[("All formats", "*.txt")])
         self.jt = 0
@@ -707,7 +704,7 @@ class VIEWER:
             unit_flag = (sunit == '') or (sunit in unit)
             desc_flag = (sdesc == '') or (sdesc in descr)
             if key_flag and unit_flag and desc_flag:
-                if len(val.data.shape) == dim or dim == 3:
+                if val.data.ndim == dim or dim == 3:
                     print key.ljust(10), unit.ljust(16), descr.ljust(20)
         print('')
 
@@ -725,6 +722,7 @@ if __name__ == "__main__":
             print('Usage: cdfplayer [<cdf file> [<profile list file>]]')
             sys.exit()
         else:
+            import tr_path
             tr = tr_path.TR_PATH(f)
             f = tr.fcdf
         if os.path.isfile(f):
