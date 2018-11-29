@@ -1,9 +1,15 @@
 import sys, os, shutil
 sys.path.append('/afs/ipp/home/g/git/python/repository')
-import Tkinter as tk
-import ttk
-from tkFileDialog import askopenfilename, asksaveasfile
-import tkMessageBox
+try:
+    import Tkinter as tk
+    import ttk
+    import tkFileDialog as tkfd
+    import tkMessageBox as tkmb
+except:
+    import tkinter as tk
+    from tkinter import ttk
+    from tkinter import filedialog as tkfd
+    from tkinter import messagebox as tkmb
 
 import numpy as np
 import ufiles, read_equ, mom2rz, tkhyper, rz2psi
@@ -40,7 +46,7 @@ class VIEWER:
         self.viewframe = tk.Tk()
         self.viewframe.title('Profile viewer')
         self.viewframe.geometry('1600x960')
-
+        self.viewframe.option_add("*Font", "Helvetica")
 # Menu bar
 
         menubar = tk.Menu(self.viewframe)
@@ -78,11 +84,11 @@ class VIEWER:
 
 # Frames in main widet
 
-        self.canv_frame = tk.Frame(self.viewframe, height=900)
+        self.canv_frame = ttk.Frame(self.viewframe, height=900)
         self.canv_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
         self.canv_frame.pack_propagate(0)
 
-        toolframe = tk.Frame(self.viewframe, height=45)
+        toolframe = ttk.Frame(self.viewframe, height=45)
         toolframe.pack(side=tk.BOTTOM, fill=tk.X)
         toolframe.pack_propagate(0)
 
@@ -92,9 +98,9 @@ class VIEWER:
         self.nbpol.pack(side=tk.TOP, fill=tk.X)
         self.nbpol.bind('<Button-1>', self.on_click)
   
-        frame_eq = tk.Frame(self.nbpol)
-        frame_1d = tk.Frame(self.nbpol)
-        frame_2d = tk.Frame(self.nbpol)
+        frame_eq = ttk.Frame(self.nbpol)
+        frame_1d = ttk.Frame(self.nbpol)
+        frame_2d = ttk.Frame(self.nbpol)
 
         self.nbpol.add(frame_eq, text='Equilibirum')
         self.nbpol.add(frame_1d, text='Scalars    ')
@@ -132,10 +138,10 @@ class VIEWER:
         prevfig = tk.PhotoImage(file='%s/ButtonPrevious.gif' %locdir)
         nextfig = tk.PhotoImage(file='%s/ButtonNext.gif'     %locdir)
 
-        self.playbt = tk.Button(toolframe, command=self.play , image=self.playfig)
-        rewbt  = tk.Button(toolframe, command=self.rewind, image=rewfig )
-        prevbt = tk.Button(toolframe, command=self.prev  , image=prevfig)
-        nextbt = tk.Button(toolframe, command=self.next  , image=nextfig)
+        self.playbt = ttk.Button(toolframe, command=self.play , image=self.playfig)
+        rewbt  = ttk.Button(toolframe, command=self.rewind, image=rewfig )
+        prevbt = ttk.Button(toolframe, command=self.prev  , image=prevfig)
+        nextbt = ttk.Button(toolframe, command=self.next  , image=nextfig)
         for but in self.playbt, rewbt, prevbt, nextbt:
             but.pack(side=tk.LEFT)
 
@@ -376,8 +382,7 @@ class VIEWER:
         eqd_d['psi']     = -rz.pfm/(2.*np.pi)
 
         f_eqdsk = self.cdf_file.replace('.CDF', '.eqdsk')
-        eqd = eqdsk.EQDSK()
-        eqd.write_eqdsk(eqd_d, f_eqdsk, self.time[self.jt], f_cdf=self.cdf_file)
+        eqdsk.write_eqdsk(eqd_d, f_eqdsk, self.time[self.jt], f_cdf=self.cdf_file)
 
 
     def uf1t(self):
@@ -578,19 +583,19 @@ class VIEWER:
     def callcdf(self):
 
         dir_in = '%s/tr_client/%s' %(os.getenv('HOME'), self.tok)
-        self.cdf_file = askopenfilename(initialdir=dir_in, filetypes=[("All formats", "*.CDF")])
+        self.cdf_file = tkfd.askopenfilename(initialdir=dir_in, filetypes=[("All formats", "*.CDF")])
         self.load()
 
 
     def callset(self):
 
-        self.list_file = askopenfilename(initialdir=self.dir_set, filetypes=[("All formats", "*.txt")])
+        self.list_file = tkfd.askopenfilename(initialdir=self.dir_set, filetypes=[("All formats", "*.txt")])
         self.set_plots()
 
 
     def callsave(self):
 
-        f_out = asksaveasfile(initialdir=self.dir_set, filetypes=[("All formats", "*.txt")])
+        f_out = tkfd.asksaveasfile(initialdir=self.dir_set, filetypes=[("All formats", "*.txt")])
         out_txt = ''
         for prof in self.prof_list:
             out_txt += prof + '\n'
@@ -605,7 +610,7 @@ class VIEWER:
         sig_list = self.prof_list + self.trace_list
         self.topl = tk.Toplevel(self.viewframe)
         self.topl.resizable(0, 0)
-        tk.Label(self.topl, text="Profiles to be viewed").grid(row=0, columnspan=3)
+        ttk.Label(self.topl, text="Profiles to be viewed").grid(row=0, columnspan=3)
         self.txt = tk.Text(self.topl, width=40, height=10)
         self.txt.grid(row=1, columnspan=2)
         self.txt.insert('end', "\n".join(sig_list if profiles is None else profiles))
@@ -613,9 +618,9 @@ class VIEWER:
         scr.config(command=self.txt.yview)
         scr.grid(row=1, column=2, sticky=tk.N+tk.S)
         self.txt.config(yscrollcommand=scr.set)
-        b = tk.Button(self.topl, text="OK", command=self.dialog_ok)
+        b = ttk.Button(self.topl, text="OK", command=self.dialog_ok)
         b.grid(row=2, column=0)
-        b = tk.Button(self.topl, text="Cancel", command=self.topl.destroy)
+        b = ttk.Button(self.topl, text="Cancel", command=self.topl.destroy)
         b.grid(row=2, column=1)
 
 
@@ -628,7 +633,7 @@ class VIEWER:
             self.set_plots(pr_list=newsigs)
         except Exception, e:
             print('Error!')
-            tkMessageBox.showerror('Error', 'This went wrong: %s'%repr(e))
+            tkmb.showerror('Error', 'This went wrong: %s'%repr(e))
             self.prof_list  = oldprofiles
             self.trace_list = oldtraces
         self.topl.destroy()
@@ -652,8 +657,8 @@ class VIEWER:
 
         nrow = 0
         for key in entries:
-            lbl = tk.Label(dispframe, text=key, fg="#000000")
-            var = tk.Entry(dispframe, width=12)
+            lbl = ttk.Label(dispframe, text=key)
+            var = ttk.Entry(dispframe, width=12)
             lbl.grid(row=nrow, column=0, sticky=tk.W+tk.E)
             var.grid(row=nrow, column=1, sticky=tk.W+tk.E)
             var.insert(0, '')
@@ -661,16 +666,16 @@ class VIEWER:
             nrow += 1
         dim = tk.IntVar()
         dim.set(3)
-        rb1 = tk.Radiobutton(dispframe, text='Scalar' , variable=dim, val=1)
-        rb2 = tk.Radiobutton(dispframe, text='Profile', variable=dim, val=2)
-        rb3 = tk.Radiobutton(dispframe, text='All', variable=dim, val=3)
+        rb1 = ttk.Radiobutton(dispframe, text='Scalar' , variable=dim, val=1)
+        rb2 = ttk.Radiobutton(dispframe, text='Profile', variable=dim, val=2)
+        rb3 = ttk.Radiobutton(dispframe, text='All', variable=dim, val=3)
         rb1.grid(row=nrow, column=0, sticky=tk.W+tk.E)
         rb2.grid(row=nrow, column=1, sticky=tk.W+tk.E)
         rb3.grid(row=nrow, column=2, sticky=tk.W+tk.E)
         self.disp_d['dim'] = dim
         nrow += 1
-        but1 = tk.Button(dispframe, text='Print variable', command=self.print_vars)
-        but2 = tk.Button(dispframe, text='Close', command=dispframe.destroy)
+        but1 = ttk.Button(dispframe, text='Print variable', command=self.print_vars)
+        but2 = ttk.Button(dispframe, text='Close', command=dispframe.destroy)
         but1.grid(row=nrow, column=0)
         but2.grid(row=nrow, column=1)
 

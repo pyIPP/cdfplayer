@@ -104,15 +104,19 @@ class READ_FBM:
         self.a_d    = {}
         self.e_d    = {}
         self.bdens  = {}
+        self.btrap  = {}
         self.trap_pit   = {}
         self.int_en_pit = {}
+        self.int_en_pit_frac_trap = {}
         self.dens_zone  = {}
+        self.trap_zone  = {}
         self.dens_vol   = {}
-        self.frac_trap  = {}
+        self.trap_vol   = {}
 
         for spc_lbl in spec_lab:
 
             self.fdist[spc_lbl] = 0.5*cv['F_%s' %spc_lbl].data
+            print(cv['F_%s' %spc_lbl].units)
             self.a_d[spc_lbl]   =     cv['A_%s' %spc_lbl].data
             self.e_d[spc_lbl]   =     cv['E_%s' %spc_lbl].data
             fbm = self.fdist[spc_lbl]
@@ -123,38 +127,39 @@ class READ_FBM:
 
             dpa_dE = np.outer(dpa, dE)
 
-# Passing vs trapped
+# Trapped particles distribution
 
-            fbm_pass = np.zeros((n_cells, n_E))
-            fbm_trap = np.zeros((n_cells, n_E))
+            fbm_trap = np.zeros((n_cells, n_pit, n_E))
+            fbm_trap[:, :, :] = fbm[:, :, :]
             self.trap_pit[spc_lbl] = 1. - rmaj_min[rho_lab[:]]/self.r2d[:]
             for jcell in range(n_cells):
                 ind_trap = (self.a_d[spc_lbl]**2 <= self.trap_pit[spc_lbl][jcell])
-                if ind_trap.any():
-                    fbm_trap[jcell, :] = np.tensordot(fbm[jcell, ind_trap , :], dpa[ind_trap] , axes=(0, 0))
-                if (~ind_trap).any():
-                    fbm_pass[jcell, :] = np.tensordot(fbm[jcell, ~ind_trap, :], dpa[~ind_trap], axes=(0, 0))
+                fbm_trap[jcell, ~ind_trap, :] = 0
 
 # Integrals
 
             self.int_en_pit[spc_lbl] = np.tensordot(fbm, dpa_dE, axes=((1, 2), (0, 1)))
-            int_en_pass = np.tensordot(fbm_pass, dE, axes=(1, 0))
-            int_en_trap = np.tensordot(fbm_trap, dE, axes=(1, 0))
+            int_en_pit_trap = np.tensordot(fbm_trap, dpa_dE, axes=((1, 2), (0, 1)))
 
             self.dens_zone[spc_lbl] = np.zeros((n_zones, n_pit, n_E))
-            self.dens_vol[spc_lbl]  = np.tensordot(fbm, bmvol, axes=(0,0))/np.sum(bmvol)
+            self.trap_zone[spc_lbl] = np.zeros((n_zones, n_pit, n_E))
+
+            self.dens_vol[spc_lbl]  = np.tensordot(fbm     , bmvol, axes=(0, 0))/np.sum(bmvol)
+            self.trap_vol[spc_lbl]  = np.tensordot(fbm_trap, bmvol, axes=(0, 0))/np.sum(bmvol)
             vol_zone = np.zeros(n_zones)
             for jrho in range(n_zones):
                 indrho = (rho_lab == jrho)
                 vol_zone[jrho] = np.sum(bmvol[indrho])
-                self.dens_zone[spc_lbl][jrho, :, :] = np.tensordot(fbm[indrho, :, :], bmvol[indrho], axes = (0, 0))
+                self.dens_zone[spc_lbl][jrho, :, :] = np.tensordot(fbm[     indrho, :, :], bmvol[indrho], axes = (0, 0))
+                self.trap_zone[spc_lbl][jrho, :, :] = np.tensordot(fbm_trap[indrho, :, :], bmvol[indrho], axes = (0, 0))
                 self.dens_zone[spc_lbl][jrho, :, :] *= 1/vol_zone[jrho]
+                self.trap_zone[spc_lbl][jrho, :, :] *= 1/vol_zone[jrho]
 
             self.bdens[spc_lbl] = np.tensordot(self.dens_zone[spc_lbl], dpa_dE, axes=((1, 2), (0, 1)))
+            self.btrap[spc_lbl] = np.tensordot(self.trap_zone[spc_lbl], dpa_dE, axes=((1, 2), (0, 1)))
 
             part_tot = np.sum(self.bdens[spc_lbl]*vol_zone)
-            pass_tot = np.sum(int_en_pass*bmvol)
-            trap_tot = np.sum(int_en_trap*bmvol)
-            print('Passing #%12.4e  Trapped #%12.4e    Total #%12.4e' %(pass_tot, trap_tot, part_tot))
+            trap_tot = np.sum(self.btrap[spc_lbl]*vol_zone)
+            print('Trapped #%12.4e    Total #%12.4e    Fraction %12.4e' %(trap_tot, part_tot, trap_tot/part_tot))
             print('Volume averaged fast ion density #12.4e m^-3' %(part_tot/vol))
-            self.frac_trap[spc_lbl] = int_en_trap/(int_en_pass + int_en_trap)
+            self.int_en_pit_frac_trap[spc_lbl] = int_en_pit_trap/self.int_en_pit[spc_lbl]

@@ -2,12 +2,18 @@ import os, sys
 sys.path.append('/afs/ipp/home/g/git/python/repository')
 import numpy as np
 from scipy.io import netcdf
-import Tkinter as tk
-import ttk
+try:
+    import Tkinter as tk
+    import ttk
+    import tkMessageBox as tkmb
+except:
+    import tkinter as tk
+    from tkinter import ttk
+    from tkinter import messagebox as tkmb
+
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 import plot_sections, read_fbm
-from tkMessageBox import *
 
 
 def read_birth(birth_file, topframe=None):
@@ -16,7 +22,7 @@ def read_birth(birth_file, topframe=None):
     print('Reading %s' %birth_file)
 
     if not os.path.isfile(birth_file):
-        showerror("Error", '%s not found' %birth_file)
+        tkmb.showerror("Error", '%s not found' %birth_file)
         return
 
     birthfile  = birth_file.split('/')[-1]
@@ -335,5 +341,6 @@ if __name__ == "__main__":
     birth_tk = tk.Tk()
     birth_tk.title('Birth location')
     birth_tk.geometry('1500x940')
+    birth_tk.option_add("*Font", "Helvetica")
     read_birth(fbirth, topframe=birth_tk)
     birth_tk.mainloop()
