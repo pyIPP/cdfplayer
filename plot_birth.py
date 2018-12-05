@@ -25,9 +25,10 @@ def read_birth(birth_file, topframe=None):
         tkmb.showerror("Error", '%s not found' %birth_file)
         return
 
-    birthfile  = birth_file.split('/')[-1]
-    runid    = birthfile[:8]
-    t_id     = birth_file[-1]
+    birthdir, birthfile  = os.path.split(birth_file)
+    tmp = birthfile.split('_')
+    runid = tmp[0]
+    t_id  = birthfile.split('cdf')[-1]
 
     fbm_file = birth_file.replace('birth.cdf%s' %t_id, 'fi_%s.cdf' %t_id)
     if not os.path.isfile(fbm_file):
