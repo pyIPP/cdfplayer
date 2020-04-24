@@ -1,11 +1,21 @@
-import re
+import os, re
 import webbrowser
-import Tkinter as tk
+try:
+    import Tkinter as tk
+except:
+    import tkinter as tk
 
+os.environ['BROWSER'] = '/usr/bin/firefox'
+
+ 
 class HyperlinkMessageBox():
+
+
     hyperlinkPattern = re.compile(r'<a href="(?P<address>.*?)">(?P<title>.*?)'
+
                                   '</a>')
     def __init__(self, title=None, message=None, geom="300x80", **options):
+
         master = tk.Tk()
         master.geometry(geom)
         self.text = tk.Text(master, wrap=tk.WORD, bg=master.cget('bg'),
@@ -16,8 +26,10 @@ class HyperlinkMessageBox():
         tk.Button(master, text="Ok",
                command=lambda *a, **k: master.destroy()).pack()
         master.mainloop()
+
  
     def _formatHyperLink(self, message):
+
         text = self.text
         start = 0
         for index, match in enumerate(self.hyperlinkPattern.finditer(message)):
@@ -43,8 +55,11 @@ class HyperlinkMessageBox():
         else:
             text.insert("end", message[start:])
  
+
     def _callbackFactory(self, url):
+
         return lambda *args, **kwargs: webbrowser.open(url)
+
 
 if __name__ == "__main__":
  

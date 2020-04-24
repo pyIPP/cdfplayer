@@ -1,4 +1,4 @@
-from netCDF4 import Dataset
+from scipy.io import netcdf
 import numpy as np
 
 
@@ -7,21 +7,23 @@ class READ_EQU:
 
     def __init__(self, cdf_file, tvec=None, rho=None):
 
-        cdf = Dataset(cdf_file, 'r', format='NETCDF4')
-        cv = cdf.variables
+        cv1 = netcdf.netcdf_file(cdf_file, 'r', mmap=False).variables
+        cv = {}
+        for key, val in cv1.items():
+            cv[key] = np.atleast_1d(val.data)
 
         ntim, nr = cv['RMC00'].shape
 
-        tim = cv['TIME3'][:]
+        tim = cv['TIME3']
         xb  = cv['XB'][0, :]
 
-        if tvec == None:
+        if tvec is None:
             tind = np.arange(ntim)
         else:
             tvec = np.atleast_1d(tvec)
             tind = np.argmin(np.abs(tim[:, None] - tvec[None, :]), axis=0)
 
-        if rho == None:
+        if rho is None:
             rind = np.arange(nr)
         else:
             rho  = np.atleast_1d(rho)
@@ -35,7 +37,7 @@ class READ_EQU:
         self.time = tim[tind]
         nmom = 0
         rcl = 'RMC00'
-        while rcl in cv.iterkeys():
+        while rcl in cv.keys():
             nmom += 1
             rcl = 'RMC0%d' %nmom
 
@@ -47,16 +49,15 @@ class READ_EQU:
         for jmom in range(0, nmom):
             rcl = 'RMC0%d' %jmom
             zcl = 'YMC0%d' %jmom
-            rc[..., jmom] = cv[rcl][tind, rind]
-            zc[..., jmom] = cv[zcl][tind, rind]
+            rc[..., jmom] = cv[rcl][:, rind][tind, :]
+            zc[..., jmom] = cv[zcl][:, rind][tind, :]
 
             if jmom > 0:
                 rsl = 'RMS0%d' %jmom
                 zsl = 'YMS0%d' %jmom
-                rs[..., jmom] = cv[rsl][tind, rind]
-                zs[..., jmom] = cv[zsl][tind, rind]
+                rs[..., jmom] = cv[rsl][:, rind][tind, :]
+                zs[..., jmom] = cv[zsl][:, rind][tind, :]
 
-        cdf.close()
         self.rc = np.squeeze(rc)
         self.zc = np.squeeze(zc)
         self.rs = np.squeeze(rs)

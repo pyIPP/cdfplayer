@@ -1,5 +1,7 @@
+#!/usr/bin/env python
+
 import sys, os, shutil
-sys.path.append('/afs/ipp/home/g/git/python/repository')
+
 try:
     import Tkinter as tk
     import ttk
@@ -12,8 +14,13 @@ except:
     from tkinter import messagebox as tkmb
 
 import numpy as np
-import ufiles, read_equ, mom2rz, tkhyper, rz2psi
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
+import ufiles, tr_read_ctr, tkhyper, ctr2rz
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+try:
+    from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk as nt2tk
+except:
+    from matplotlib.backends.backend_tkagg import NavigationToolbar2TkAgg as nt2tk
+
 from matplotlib.figure import Figure
 import matplotlib.pylab as plt
 from scipy.io import netcdf
@@ -44,8 +51,12 @@ class VIEWER:
 
         print('Setting GUI frame')
         self.viewframe = tk.Tk()
-        self.viewframe.title('Profile viewer')
-        self.viewframe.geometry('1600x960')
+        xmax = self.viewframe.winfo_screenwidth()
+        ymax = self.viewframe.winfo_screenheight()
+        width  = min(1600, int(0.95*xmax))
+        height = min(960, int(0.88*ymax)) 
+        self.viewframe.title('NetCDF viewer')
+        self.viewframe.geometry('%dx%d' %(width, height))
         self.viewframe.option_add("*Font", "Helvetica")
 # Menu bar
 
@@ -123,11 +134,11 @@ class VIEWER:
 
 # Navigation toolbars
 
-        toolbar = NavigationToolbar2TkAgg( self.canv_eq, frame_eq)
+        toolbar = nt2tk( self.canv_eq, frame_eq)
         toolbar.update()
-        toolbar = NavigationToolbar2TkAgg( self.canv_1d, frame_1d)
+        toolbar = nt2tk( self.canv_1d, frame_1d)
         toolbar.update()
-        toolbar = NavigationToolbar2TkAgg( self.canv_2d, frame_2d)
+        toolbar = nt2tk( self.canv_2d, frame_2d)
         toolbar.update()
 
 # Toolbar
@@ -181,7 +192,7 @@ class VIEWER:
         print('Reading equilibrium from %s' %f_cdf)
         rho = np.linspace(0.1, 1.0, 10)
         if 'TIME3' in self.cv.keys():
-            self.surf = read_equ.READ_EQU(f_cdf, rho=rho)
+            self.surf = tr_read_ctr.TR_READ_CTR(f_cdf, rho=rho, nthe=201, endpoint=True)
 
 
     def set_plots(self, pr_list=None):
@@ -237,9 +248,8 @@ class VIEWER:
 # Equilibrium
 
         if hasattr(self, 'surf'):
-            npoints = 201
-            self.R, self.Z = mom2rz.mom2rz(self.surf.rc, \
-                self.surf.rs, self.surf.zc, self.surf.zs, nthe=npoints, endpoint=True)
+            self.R = self.surf.Rsurf
+            self.Z = self.surf.Zsurf
         else:
             self.R = self.cv['Rsurf'].data
             self.Z = self.cv['Zsurf'].data
@@ -271,11 +281,15 @@ class VIEWER:
 # Plot AUG structures
 #        nshot = int(self.runid[0:5])
         try:
-            import plot_aug
+            import get_gc
             if hasattr(self, 'surf'):
-                plot_aug.vessel_pol(ax_eq, fac=100.)
+                fac=100.
             else:
-                plot_aug.vessel_pol(ax_eq, fac=1.)
+                fac=1.
+            gc_r, gc_z = get_gc.get_gc()
+            for key in gc_r.keys():
+                ax_eq.plot(fac*gc_r[key], fac*gc_z[key], 'b-')
+
         except:
             pass
 
@@ -339,7 +353,7 @@ class VIEWER:
         eq = get_sf_grid.get_grid(self.runid)
         Rgrid = eq['Ri'][:, 0]
         zgrid = eq['Zj'][:, 0]
-        rz = rz2psi.RZ2PSI(self.cdf_file, it=self.jt)
+        rz = ctr2rz.CTR2RZ(self.cdf_file, it=self.jt)
 
         data = {}
         for lbl in cdf1d + cdf2d + coord:
@@ -582,8 +596,12 @@ class VIEWER:
 
     def callcdf(self):
 
-        dir_in = '%s/tr_client/%s' %(os.getenv('HOME'), self.tok)
-        self.cdf_file = tkfd.askopenfilename(initialdir=dir_in, filetypes=[("All formats", "*.CDF")])
+        if hasattr(self, 'cdf_file'):
+            dir_init = os.path.dirname(self.cdf_file)
+        else:
+            dir_init = '%s/tr_client/%s' %(os.getenv('HOME'), self.tok)
+        self.cdf_file = tkfd.askopenfilename(initialdir=dir_init, filetypes=[("All formats", "*.CDF")])
+
         self.load()
 
 
@@ -631,9 +649,8 @@ class VIEWER:
         oldtraces   = self.trace_list
         try:
             self.set_plots(pr_list=newsigs)
-        except Exception, e:
+        except ValueError:
             print('Error!')
-            tkmb.showerror('Error', 'This went wrong: %s'%repr(e))
             self.prof_list  = oldprofiles
             self.trace_list = oldtraces
         self.topl.destroy()
