@@ -78,8 +78,8 @@ class VIEWER:
         savemenu.add_command(label="Save 1D u-file(rho)"   , command=self.uf1r)
         savemenu.add_command(label="Save 2D u-file(t, rho)", command=self.uf2)
         savemenu.add_command(label="Save 2D as .avi"       , command=self.smov)
+        savemenu.add_command(label="Save eqdsk"            , command=self.eqdisk)
         if self.tok == 'AUGD':
-            savemenu.add_command(label="Save eqdsk"                 , command=self.eqdisk)
             savemenu.add_command(label="Save shotfile (all signals)", command=self.tr2sf)
             savemenu.add_command(label="Save equil shotfile"        , command=self.cdf2tre)
 
