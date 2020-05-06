@@ -74,10 +74,10 @@ class VIEWER:
         editmenu.add_command(label="Edit setup...", command=self.editlist)
 
         savemenu = tk.Menu(menubar, tearoff=0)
-        savemenu.add_command(label="Save 1D u-file(t)"          , command=self.uf1t)
-        savemenu.add_command(label="Save 1D u-file(rho)"        , command=self.uf1r)
-        savemenu.add_command(label="Save 2D u-file(t, rho)"     , command=self.uf2)
-        savemenu.add_command(label="Save 2D as .avi"            , command=self.smov)
+        savemenu.add_command(label="Save 1D u-file(t)"     , command=self.uf1t)
+        savemenu.add_command(label="Save 1D u-file(rho)"   , command=self.uf1r)
+        savemenu.add_command(label="Save 2D u-file(t, rho)", command=self.uf2)
+        savemenu.add_command(label="Save 2D as .avi"       , command=self.smov)
         if self.tok == 'AUGD':
             savemenu.add_command(label="Save eqdsk"                 , command=self.eqdisk)
             savemenu.add_command(label="Save shotfile (all signals)", command=self.tr2sf)
@@ -95,9 +95,9 @@ class VIEWER:
 
 # Frames in main widet
 
-        self.canv_frame = ttk.Frame(self.viewframe, height=900)
-        self.canv_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-        self.canv_frame.pack_propagate(0)
+        canv_frame = ttk.Frame(self.viewframe, height=height-60)
+        canv_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        canv_frame.pack_propagate(0)
 
         toolframe = ttk.Frame(self.viewframe, height=45)
         toolframe.pack(side=tk.BOTTOM, fill=tk.X)
@@ -105,17 +105,17 @@ class VIEWER:
 
 # Plots
 
-        self.nbpol = ttk.Notebook(self.canv_frame, name='nbpol')
-        self.nbpol.pack(side=tk.TOP, fill=tk.X)
-        self.nbpol.bind('<Button-1>', self.on_click)
-  
-        frame_eq = ttk.Frame(self.nbpol)
-        frame_1d = ttk.Frame(self.nbpol)
-        frame_2d = ttk.Frame(self.nbpol)
+        nbpol = ttk.Notebook(canv_frame, name='nbpol')
+        nbpol.pack(side=tk.TOP, fill=tk.X)
+        nbpol.bind('<Button-1>', self.on_click)
 
-        self.nbpol.add(frame_eq, text='Equilibirum')
-        self.nbpol.add(frame_1d, text='Scalars    ')
-        self.nbpol.add(frame_2d, text='Profiles   ')
+        frame_eq = ttk.Frame(nbpol)
+        frame_1d = ttk.Frame(nbpol)
+        frame_2d = ttk.Frame(nbpol)
+
+        nbpol.add(frame_eq, text='Equilibirum')
+        nbpol.add(frame_1d, text='Scalars    ')
+        nbpol.add(frame_2d, text='Profiles   ')
 
         self.fig_eq = Figure(figsize=(14., 8.5), dpi=100)
         self.fig_1d = Figure(figsize=(14., 8.5), dpi=100)
@@ -125,20 +125,19 @@ class VIEWER:
             wspace=0.3, hspace=0.3)
         self.fig_2d.subplots_adjust(left=0.05, bottom=0.1, right=0.97, top=0.92, \
             wspace=0.3, hspace=0.3)
-        self.canv_eq = FigureCanvasTkAgg(self.fig_eq, master=frame_eq)
-        self.canv_1d = FigureCanvasTkAgg(self.fig_1d, master=frame_1d)
-        self.canv_2d = FigureCanvasTkAgg(self.fig_2d, master=frame_2d)
-        self.canv_eq._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-        self.canv_1d._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-        self.canv_2d._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        canv_eq = FigureCanvasTkAgg(self.fig_eq, master=frame_eq)
+        canv_1d = FigureCanvasTkAgg(self.fig_1d, master=frame_1d)
+        canv_2d = FigureCanvasTkAgg(self.fig_2d, master=frame_2d)
+        for canv in canv_eq, canv_1d, canv_2d:
+            canv._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
 # Navigation toolbars
 
-        toolbar = nt2tk( self.canv_eq, frame_eq)
+        toolbar = nt2tk( canv_eq, frame_eq)
         toolbar.update()
-        toolbar = nt2tk( self.canv_1d, frame_1d)
+        toolbar = nt2tk( canv_1d, frame_1d)
         toolbar.update()
-        toolbar = nt2tk( self.canv_2d, frame_2d)
+        toolbar = nt2tk( canv_2d, frame_2d)
         toolbar.update()
 
 # Toolbar
@@ -518,19 +517,19 @@ class VIEWER:
 # Plot mag. axis:
             if hasattr(self, 'surf'):
                 self.equline['axis'].set_data(self.surf.r_mag[self.jt], self.surf.z_mag[self.jt])
-            self.canv_eq.draw()
-            
+            self.fig_eq.canvas.draw()
+
         elif self.jtab == 1:
             for trace in self.trace_list:
                 self.mark1d[trace].set_data(self.time[self.jt], self.cv[trace][self.jt])
             self.txt_1d.set_text(strtim)
-            self.canv_1d.draw()
+            self.fig_1d.canvas.draw()
 
         elif self.jtab == 2:
             for prof in self.prof_list:
                 self.line2d[prof].set_ydata(self.cv[prof][self.jt, :])
             self.txt_2d.set_text(strtim)
-            self.canv_2d.draw()
+            self.fig_2d.canvas.draw()
 
 
     def prev(self):
@@ -581,7 +580,7 @@ class VIEWER:
         while self.ff and self.jt < self.nt - 1:
             self.jt += 1
             self.update_plot()
-            self.canv_eq.start_event_loop(self.timeout)
+            self.fig_eq.canvas.start_event_loop(self.timeout)
 
 
     def rewind(self):
@@ -591,7 +590,7 @@ class VIEWER:
         while self.rw and self.jt > 0:
             self.jt -= 1
             self.update_plot()
-            self.canv_eq.start_event_loop(self.timeout)
+            self.fig_eq.canvas.start_event_loop(self.timeout)
 
 
     def callcdf(self):
