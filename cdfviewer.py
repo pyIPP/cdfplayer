@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, os, shutil
+import sys, os
 
 try:
     import Tkinter as tk
@@ -200,7 +200,7 @@ class VIEWER:
         self.equline = {}
         self.line1d  = {}
         self.line2d  = {}
-
+        print('list_file', self.list_file)
         if os.path.isfile(self.list_file) and pr_list is None:
             f = open(self.list_file)
             pr_list = [s.strip() for s in f.readlines()]
@@ -303,7 +303,7 @@ class VIEWER:
             ax_1d.grid('on')
             self.mark1d[trace], = ax_1d.plot(self.time[0], self.cv[trace][0], 'go')
             jplot += 1
-            ax_1d.ticklabel_format(axis='y', style='sci', scilimits=(-4,-4))
+            ax_1d.ticklabel_format(axis='y', style='sci', scilimits=(-4, 4))
             ax_1d.yaxis.major.formatter._useMathText = True
 
         jplot = 1
@@ -326,7 +326,7 @@ class VIEWER:
             ax_2d.set_ylabel(ylab, fontsize=fsize)
             self.line2d[prof], = ax_2d.plot(xrho, self.cv[prof][0, :], 'b-')
             ax_2d.grid('on')
-            ax_2d.ticklabel_format(axis='y', style='sci', scilimits=(-4,-4))
+            ax_2d.ticklabel_format(axis='y', style='sci', scilimits=(-4, 4))
             ax_2d.yaxis.major.formatter._useMathText = True
             jplot += 1
 
@@ -595,10 +595,7 @@ class VIEWER:
 
     def callcdf(self):
 
-        if hasattr(self, 'cdf_file'):
-            dir_init = os.path.dirname(self.cdf_file)
-        else:
-            dir_init = '%s/tr_client/%s' %(os.getenv('HOME'), self.tok)
+        dir_init = '%s/tr_client/%s' %(os.getenv('HOME'), self.tok)
         self.cdf_file = tkfd.askopenfilename(initialdir=dir_init, filetypes=[("All formats", "*.CDF")])
 
         self.load()
@@ -718,27 +715,30 @@ class VIEWER:
 
 if __name__ == "__main__":
 
+    import argparse
+    parser = argparse.ArgumentParser(description='RABBIT viewer')
+    parser.add_argument('-cdf', '--cdf_file', type=str, help='CDF filename', required=False)
+    parser.add_argument('-list', '--list_file', type=str, help='List of signals to plot', required=False)
+    parser.add_argument('-rid', '--runid', type=str, help='List of signals to plot', required=False)
+
+    args = parser.parse_args()
 
     cdf_file  = '/afs/ipp/home/g/git/tr_client/AUGD/23076/W01/23076W01.CDF'
     list_file = ''
 
-    if len(sys.argv) > 2:
-        f = sys.argv[2]
-        if f in ('-h', '--help', '-?'):
-            print('Usage: cdfplayer [<cdf file> [<profile list file>]]')
-            sys.exit()
+    if args.cdf_file is None:
+        if args.runid is None:
+            cdf_file  = '/afs/ipp/home/g/git/tr_client/AUGD/23076/W01/23076W01.CDF'
         else:
-            import tr_path
-            tr = tr_path.TR_PATH(f)
-            f = tr.fcdf
-        if os.path.isfile(f):
-            cdf_file = f
-    if len(sys.argv) > 3:
-            f = sys.argv[3]
-            if os.path.isfile(f):
-                list_file = f
-            else:
-                f_path = os.getenv('HOME') + '/python/cdfp/' + f
-                if os.path.isfile(f_path):
-                    list_file = f_path
+            shot = args.runid[:-3]
+            tail = args.runid[-3:]
+            cdf_file = '%s/tr_client/AUGD/%s/%s/%s.CDF' %(os.getenv('HOME'), shot, tail, args.runid)
+    else:
+        cdf_file = args.cdf_file
+
+    if args.list_file is None:
+        list_file = ''
+    else:
+        list_file = args.list_file
+
     VIEWER(cdf_file, list_file=list_file)

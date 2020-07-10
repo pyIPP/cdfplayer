@@ -20,7 +20,7 @@ def cdf2tre(runid, time=-1):
     nshot = int(runid[0:5])
     tail = runid[5:8]
     fcdf = '%s/%d/%s/%s.CDF' %(sfhdir, nshot, tail, runid)
-    fsfh = '%s/tr_client/AUGD/TRE00000.sfh' %homdir
+    fsfh = '%s/TRE00000.sfh' %sfhdir
     if not os.path.isfile(fcdf):
         print('%s not found' %fcdf)
         return
@@ -191,7 +191,7 @@ def cdf2tre(runid, time=-1):
 #-----------------
 
     for jt in range(nt):
-        rz = ctr2rz.CTR2RZ(fcdf, it=jt, vplot=False)
+        rz = ctr2rz.CTR2RZ(fcdf, it=jt)
         tre['PFM'][:, :, jt] = rz.pfm           # Pol. flux matrix
         tre['PFL'][:, jt] += rz.pf_shift
         tre['RPFx'][1, jt] = r_sep[jt, j_xpoint[jt]]  # R lower X-point
