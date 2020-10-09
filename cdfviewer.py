@@ -22,7 +22,6 @@ except:
     from matplotlib.backends.backend_tkagg import NavigationToolbar2TkAgg as nt2tk
 
 from matplotlib.figure import Figure
-import matplotlib.pylab as plt
 from scipy.io import netcdf
 
 
@@ -226,7 +225,7 @@ class VIEWER:
             if sig in self.cv.keys():
                 self.lbl[sig]  = self.cv[sig].long_name[:-2]
                 self.dim[sig]  = self.cv[sig].dimensions
-                self.unit[sig] = self.cv[sig].units
+                self.unit[sig] = self.cv[sig].units.decode('utf-8')
                 self.nt = self.cv[sig].data.shape[0]
                 if self.cv[sig].data.ndim > 1:
                     self.prof_list.append(sig)
@@ -700,13 +699,16 @@ class VIEWER:
         skey  = self.disp_d['Var_name'].get().upper().strip()
         sunit = self.disp_d['Unit'].get().upper().strip()
         sdesc = self.disp_d['Description'].get().upper().strip()
+        skey  =  skey.encode('utf8') if not isinstance(skey , bytes) else skey
+        sunit = sunit.encode('utf8') if not isinstance(sunit, bytes) else sunit
+        sdesc = sdesc.encode('utf8') if not isinstance(sdesc, bytes) else sdesc
         dim = self.disp_d['dim'].get()
         for key, val in self.cv.items():
             unit  = val.units.strip()
             descr = val.long_name.strip()
-            key_flag  = (skey  == '') or (skey  in key)
-            unit_flag = (sunit == '') or (sunit in unit)
-            desc_flag = (sdesc == '') or (sdesc in descr)
+            key_flag  = (skey  == b'') or (skey  in key)
+            unit_flag = (sunit == b'') or (sunit in unit)
+            desc_flag = (sdesc == b'') or (sdesc in descr)
             if key_flag and unit_flag and desc_flag:
                 if val.data.ndim == dim or dim == 3:
                     print(key.ljust(10), unit.ljust(16), descr.ljust(20))
