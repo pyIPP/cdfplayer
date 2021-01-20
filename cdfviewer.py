@@ -14,7 +14,7 @@ except:
     from tkinter import messagebox as tkmb
 
 import numpy as np
-import ufiles, tr_read_ctr, tkhyper, ctr2rz
+import ufiles, tr_read_ctr, tkhyper, ctr2rz_sf
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 try:
     from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk as nt2tk
@@ -351,7 +351,7 @@ class VIEWER:
         eq = get_sf_grid.get_grid(self.runid)
         Rgrid = eq['Ri'][:, 0]
         zgrid = eq['Zj'][:, 0]
-        rz = ctr2rz.CTR2RZ(self.cdf_file, it=self.jt)
+        rz = ctr2rz_sf.CTR2RZ(self.cdf_file, it=self.jt)
 
         data = {}
         for lbl in cdf1d + cdf2d + coord:

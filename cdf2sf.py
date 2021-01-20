@@ -5,7 +5,7 @@ from scipy.io import netcdf
 import numpy as np
 import ww_20180130
 import sfh_20180130
-import ctr2rz, get_sf_grid, tr_read_ctr
+import ctr2rz_sf, get_sf_grid, tr_read_ctr
 
 ww = ww_20180130.shotfile()
 sfh = sfh_20180130.SFH()
@@ -191,7 +191,7 @@ def cdf2tre(runid, time=-1):
 #-----------------
 
     for jt in range(nt):
-        rz = ctr2rz.CTR2RZ(fcdf, it=jt)
+        rz = ctr2rz_sf.CTR2RZ(fcdf, it=jt)
         tre['PFM'][:, :, jt] = rz.pfm           # Pol. flux matrix
         tre['PFL'][:, jt] += rz.pf_shift
         tre['RPFx'][1, jt] = r_sep[jt, j_xpoint[jt]]  # R lower X-point
