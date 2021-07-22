@@ -1,14 +1,12 @@
 import sys, os
-sys.path.append('/afs/ipp/aug/ads-diags/common/python/lib')
+sys.path.append('/afs/ipp/home/g/git/python/sfutils')
 
 try:
     import Tkinter as tk
 except:
     import tkinter as tk
 import numpy as np
-import dd_20180130
-
-sf  = dd_20180130.shotfile()
+import sfread
 
 
 def get_grid(runid):
@@ -31,10 +29,10 @@ def get_grid(runid):
 
 # Fetch the matching equilibrium shotfile
 
-    if sf.Open(eq_d['!dia'], nshot, experiment=eq_d['!exp'], edition=int(eq_d['!ed'])):
-        for sgr in ('PFM', 'Ri', 'Zj', 'PFxx'):
-            eq_d[sgr] = sf.GetSignal(sgr)
-        for sig in ('time', 'ixti'):
-            eq_d[sig] = sf.GetSignal(sig)
-        sf.Close()
+    equ = sfread.SFREAD(nshot, eq_d['!dia'], exp=eq_d['!exp'], ed=int(eq_d['!ed']))
+    print(equ.status)
+    if equ.status:
+        for obj in ('PFM', 'Ri', 'Zj', 'PFxx', 'time', 'ixti'):
+            eq_d[obj] = equ.getobject(obj)
+
     return eq_d

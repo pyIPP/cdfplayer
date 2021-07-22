@@ -25,6 +25,15 @@ from matplotlib.figure import Figure
 from scipy.io import netcdf
 
 
+def to_str(str_or_byt):
+    """
+    Converts a plain string to a byte string (python3 compatibility)
+    """
+
+    str_out = str_or_byt.decode('utf8') if isinstance(str_or_byt, bytes) else str_or_byt
+    return str_out.strip()
+
+
 class VIEWER:
 
 
@@ -279,12 +288,12 @@ class VIEWER:
 # Plot AUG structures
 #        nshot = int(self.runid[0:5])
         try:
-            import get_gc
+            import sfread
             if hasattr(self, 'surf'):
                 fac=100.
             else:
                 fac=1.
-            gc_r, gc_z = get_gc.get_gc()
+            gc_r, gc_z = sfread.get_gc()
             for key in gc_r.keys():
                 ax_eq.plot(fac*gc_r[key], fac*gc_z[key], 'b-')
 
@@ -696,19 +705,16 @@ class VIEWER:
 
     def print_vars(self):
 
-        skey  = self.disp_d['Var_name'].get().upper().strip()
-        sunit = self.disp_d['Unit'].get().upper().strip()
-        sdesc = self.disp_d['Description'].get().upper().strip()
-        skey  =  skey.encode('utf8') if not isinstance(skey , bytes) else skey
-        sunit = sunit.encode('utf8') if not isinstance(sunit, bytes) else sunit
-        sdesc = sdesc.encode('utf8') if not isinstance(sdesc, bytes) else sdesc
+        skey  = to_str(self.disp_d['Var_name'].get().upper().strip())
+        sunit = to_str(self.disp_d['Unit'].get().upper().strip())
+        sdesc = to_str(self.disp_d['Description'].get().upper().strip())
         dim = self.disp_d['dim'].get()
         for key, val in self.cv.items():
-            unit  = val.units.strip()
-            descr = val.long_name.strip()
-            key_flag  = (skey  == b'') or (skey  in key)
-            unit_flag = (sunit == b'') or (sunit in unit)
-            desc_flag = (sdesc == b'') or (sdesc in descr)
+            unit  = to_str(val.units.strip())
+            descr = to_str(val.long_name.strip())
+            key_flag  = (skey  == '') or (skey  in to_str(key))
+            unit_flag = (sunit == '') or (sunit in unit)
+            desc_flag = (sdesc == '') or (sdesc in descr)
             if key_flag and unit_flag and desc_flag:
                 if val.data.ndim == dim or dim == 3:
                     print(key.ljust(10), unit.ljust(16), descr.ljust(20))
