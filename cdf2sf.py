@@ -1,14 +1,18 @@
 # Used in cdfplayer
-
+import sys
+sys.path.append('/afs/ipp/aug/ads-diags/common/python/lib')
 import os, shutil
 from scipy.io import netcdf
 import numpy as np
-import ww_20180130
-import sfh_20180130
-import ctr2rz_sf, get_sf_grid, tr_read_ctr
+import aug_sfutils as sfu
+import sfhmod, ctr2rz_sf, get_sf_grid, tr_read_ctr
 
-ww = ww_20180130.shotfile()
-sfh = sfh_20180130.SFH()
+ww = sfu.WW()
+
+#import ww_20180130 
+#ww = ww_20180130.shotfile()
+
+sfh = sfu.SFH()
 
 
 def cdf2tre(runid, time=-1):
@@ -301,17 +305,20 @@ def cdf2tra(runid):
     fcdf = '%s/%d/%s/%s.CDF' %(sfhdir, nshot, tail, runid)
     fnml = '%sTR.DAT' %fcdf[: -4]
     fsfh = '%s/TRA00000.sfh' %sfhdir
+
     for fname in fcdf, fnml:
         if not os.path.isfile(fname):
             print('%s not found' %fname)
             return
     try:
         shutil.copy2(source, fsfh)
+        print('Copied %s to %s' %(source, fsfh))
     except:
         print('Unable to copy file %s to %s' %(source, fsfh))
         return
-    sfh_dic = sfh_20180130.sfhmod(fcdf, nml=fnml, fsfh=fsfh)
-    ww_20180130.write_sf(nshot, sfh_dic, sfhdir, 'TRA', exp=os.getenv('USER'))
+    sfh_dic = sfhmod.sfhmod(fcdf, nml=fnml, fsfh=fsfh)
+    sfu.write_sf(nshot, sfh_dic, sfhdir, 'TRA', exp=os.getenv('USER'))
+#    ww_20180130.write_sf(nshot, sfh_dic, sfhdir, 'TRA', exp=os.getenv('USER'))
 
 
 def cdf2nub(runid):
@@ -335,7 +342,7 @@ def cdf2nub(runid):
         print('Unable to copy file %s to %s' %(source, fsfh))
         return
     sfh_dic = sfh_20180130.sfhmod(fcdf, nml=fnml, fsfh=fsfh)
-    ww_20180130.write_sf(nshot, sfh_dic, sfhdir, 'NUB', exp=os.getenv('USER'))
+    sfu.write_sf(nshot, sfh_dic, sfhdir, 'NUB', exp=os.getenv('USER'))
 
 
 if __name__ == "__main__":
