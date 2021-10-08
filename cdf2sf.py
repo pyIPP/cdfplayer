@@ -4,15 +4,15 @@ sys.path.append('/afs/ipp/aug/ads-diags/common/python/lib')
 import os, shutil
 from scipy.io import netcdf
 import numpy as np
-import aug_sfutils as sfu
+import aug_sfutils as sf
 import sfhmod, ctr2rz_sf, get_sf_grid, tr_read_ctr
 
-ww = sfu.WW()
+ww = sf.WW()
 
 #import ww_20180130 
 #ww = ww_20180130.shotfile()
 
-sfh = sfu.SFH()
+sfh = sf.SFH()
 
 
 def cdf2tre(runid, time=-1):
@@ -317,7 +317,7 @@ def cdf2tra(runid):
         print('Unable to copy file %s to %s' %(source, fsfh))
         return
     sfh_dic = sfhmod.sfhmod(fcdf, nml=fnml, fsfh=fsfh)
-    sfu.write_sf(nshot, sfh_dic, sfhdir, 'TRA', exp=os.getenv('USER'))
+    sf.write_sf(nshot, sfh_dic, sfhdir, 'TRA', exp=os.getenv('USER'))
 #    ww_20180130.write_sf(nshot, sfh_dic, sfhdir, 'TRA', exp=os.getenv('USER'))
 
 
@@ -342,7 +342,7 @@ def cdf2nub(runid):
         print('Unable to copy file %s to %s' %(source, fsfh))
         return
     sfh_dic = sfh_20180130.sfhmod(fcdf, nml=fnml, fsfh=fsfh)
-    sfu.write_sf(nshot, sfh_dic, sfhdir, 'NUB', exp=os.getenv('USER'))
+    sf.write_sf(nshot, sfh_dic, sfhdir, 'NUB', exp=os.getenv('USER'))
 
 
 if __name__ == "__main__":

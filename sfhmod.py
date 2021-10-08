@@ -1,9 +1,9 @@
 import os
 import numpy as np
-import aug_sfutils as sfu
+import aug_sfutils as sf
 import parse_nml
 
-sfh = sfu.SFH()
+sfh = sf.SFH()
 
 def sfhmod(cdf_file, nml=None, fsfh='TRA00000.sfh'):
 
@@ -22,7 +22,7 @@ def sfhmod(cdf_file, nml=None, fsfh='TRA00000.sfh'):
     cv = netcdf.netcdf_file(cdf_file, 'r', mmap=False).variables
     sfh_d = {}
 
-    sfo = sfu.SFREAD(sfh=fsfh)
+    sfo = sf.SFREAD(sfh=fsfh)
     err = sfh.Open(fsfh)
     if err != 0:
         return

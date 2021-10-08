@@ -1,12 +1,11 @@
 import sys, os
-sys.path.append('/afs/ipp/home/g/git/python/sfutils')
+import aug_sfutils as sf
 
 try:
     import Tkinter as tk
 except:
     import tkinter as tk
 import numpy as np
-import sfread
 
 
 def get_grid(runid):
@@ -29,7 +28,7 @@ def get_grid(runid):
 
 # Fetch the matching equilibrium shotfile
 
-    equ = sfread.SFREAD(nshot, eq_d['!dia'], exp=eq_d['!exp'], ed=int(eq_d['!ed']))
+    equ = sf.SFREAD(nshot, eq_d['!dia'], exp=eq_d['!exp'], ed=int(eq_d['!ed']))
     print(equ.status)
     if equ.status:
         for obj in ('PFM', 'Ri', 'Zj', 'PFxx', 'time', 'ixti'):
