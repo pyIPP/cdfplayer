@@ -288,14 +288,14 @@ class VIEWER:
 # Plot AUG structures
 #        nshot = int(self.runid[0:5])
         try:
-            import sfread
+            import aug_sfutils as sf
             if hasattr(self, 'surf'):
                 fac=100.
             else:
                 fac=1.
-            gc_r, gc_z = sfread.get_gc()
-            for key in gc_r.keys():
-                ax_eq.plot(fac*gc_r[key], fac*gc_z[key], 'b-')
+            gc_d = sf.getgc()
+            for gc in gc_d.values():
+                ax_eq.plot(fac*gc.r, fac*gc.z, 'b-')
 
         except:
             pass
