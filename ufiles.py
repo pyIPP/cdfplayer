@@ -58,30 +58,36 @@ __author__  = 'Giovanni Tardini (Tel. 1898)'
 __version__ = '0.02.1'
 __date__    = '03.11.2016'
 
-import datetime,os,sys,shutil
+import datetime, os, sys, shutil, logging
 import numpy as np
 import rw_for
+
+logger = logging.getLogger('trview.ufiles')
 
 now = datetime.datetime.now()
 
 
-def WU(uf_d, udir=''):
+def WU(uf_d, udir=None):
 
     nshot  = int(uf_d['shot'])
+    s5shot = '%05d' %nshot
     prestr = uf_d['pre']
     extstr = uf_d['ext']
     comment = 'Generated with write_u.py'
     if 'comm' in uf_d.keys():
         comment = uf_d['comm']
-    if udir == '':
-        udir = '%s/udb/%d' %(os.getenv('HOME'), nshot)
+    if udir is None:
+        udir = '%s/udb/%s' %(os.getenv('HOME'), s5shot)
     os.system('mkdir -p %s' %udir)
-    uf = '%s/%s%d.%s' %(udir, prestr, nshot, extstr)
+    uf = '%s/%s%s.%s' %(udir, prestr, s5shot, extstr)
     if os.path.isfile(uf):
-        ufbak = '%s~' %uf
-        print('cp %s %s' %(uf, ufbak))
-        shutil.copy2(uf, ufbak)
-    print('Writing file %s' %uf)
+        ufbak = uf
+        jext = 1
+        while os.path.isfile(ufbak):
+            ufbak = '%s.%d' %(uf, jext)
+            jext += 1
+        logger.info('mv %s %s' %(uf, ufbak))
+        shutil.move(uf, ufbak)
 
     dev = 'AUGD'
     xyz = ('X', 'Y', 'Z')
@@ -95,14 +101,14 @@ def WU(uf_d, udir=''):
             dims[coord] = len(uf_d['grid'][coord]['arr'])
     ndim = len(coords)
     if ndim != uf_d['data']['arr'].ndim:
-        print('Data ndim inconsistent with n of independent variables')
-        print('No u-file written')
+        logger.error('Data ndim inconsistent with n of independent variables')
+        logger.error('No u-file written')
         return
     for jco, coord in enumerate(coords):
         if dims[coord] != uf_d['data']['arr'].shape[jco]:
-            print('The %dth index has inconsistent grid vs data dimension: %d, %d' \
-               %(jco, dims[coord], uf_d['data']['arr'].shape[jco]))
-            print('No u-file written')
+            logger.error('The %dth index has inconsistent grid vs data dimension: %d, %d', \
+               jco, dims[coord], uf_d['data']['arr'].shape[jco] )
+            logger.error('No u-file written')
             return
         
 # Header
@@ -163,6 +169,7 @@ def WU(uf_d, udir=''):
     f = open(uf, 'w')
     f.write(ufs)
     f.close()
+    logger.info('Written file %s' %uf)
 
 
 class RU:
@@ -219,7 +226,7 @@ class RU:
 # ... Grid data
 
         if self.dim != self.nvar:
-            print('Inconsistency in the number of independent variables dim=%i nvar=%i'%(self.dim, self.nvar))
+            logger.error('Inconsistency in the number of independent variables dim=%d nvar=%d', self.dim, self.nvar)
             sys.exit()
 
         list_var = self.vars[ :self.nvar]
