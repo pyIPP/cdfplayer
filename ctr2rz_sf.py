@@ -27,7 +27,7 @@ def scatter_to_rectangular(r, z, data1, data2, Rmesh, Zmesh):
 class CTR2RZ:
 
 
-    def __init__(self, cdf_file, tim=None, it=None, Rgrid=None, Zgrid=None, n_the=3601):
+    def __init__(self, cdf_file, tim=None, it=None, Rgrid=None, Zgrid=None, n_the=3601, cliste=True):
 
 # Using m
 
@@ -67,18 +67,30 @@ class CTR2RZ:
 
 # Read CLISTE shotfile
 
-        eq = get_sf_grid.get_grid(runid)
-        self.Rgrid = eq['Ri'][:, 0] 
-        self.Zgrid = eq['Zj'][:, 0]
-        nr = len(self.Rgrid)
-        nz = len(self.Zgrid)
-        tdiff = np.abs(eq['time'] - self.time)
-        jt_aug = np.argmin(tdiff)
-        self.eq_time = eq['time'][jt_aug] # shotfile time
-        print('CDF time = %8.4f, CLISTE time = %8.4f' %(self.time, self.eq_time))
-        self.pf_eq_sep = eq['PFxx'][1, jt_aug]
-        pf_out = eq['PFM'][:, :, jt_aug]
-        self.pf_shift = self.pf_eq_sep - pf1d[-1]
+        if cliste:
+            eq = get_sf_grid.get_grid(runid)
+            self.Rgrid = eq['Ri'][:, 0] 
+            self.Zgrid = eq['Zj'][:, 0]
+            nr = len(self.Rgrid)
+            nz = len(self.Zgrid)
+            tdiff = np.abs(eq['time'] - self.time)
+            jt_aug = np.argmin(tdiff)
+            self.eq_time = eq['time'][jt_aug] # shotfile time
+            print('CDF time = %8.4f, CLISTE time = %8.4f' %(self.time, self.eq_time))
+            self.pf_eq_sep = eq['PFxx'][1, jt_aug]
+            self.pf_shift = self.pf_eq_sep - pf1d[-1]
+            pf_out = eq['PFM'][:, :, jt_aug]
+        else:
+            Rmin = min(self.Rsurf[-1]) - 0.02
+            Rmax = max(self.Rsurf[-1]) + 0.02
+            Zmin = min(self.Zsurf[-1]) - 0.02
+            Zmax = max(self.Zsurf[-1]) + 0.02
+            nr = int((Rmax - Rmin)/0.02) # 2 cm steps
+            nz = int((Zmax - Zmin)/0.02)
+            self.Rgrid = np.linspace(Rmin, Rmax, nr)
+            self.Zgrid = np.linspace(Zmin, Zmax, nz)
+            pf_out = np.zeros((nr, nz))
+            self.pf_shift = 0.
 
 # Output cartesian grid
 

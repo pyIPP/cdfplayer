@@ -87,6 +87,7 @@ class VIEWER:
         savemenu.add_command(label="Save 2D u-file(t, rho)", command=self.uf2)
         savemenu.add_command(label="Save 2D as .avi"       , command=self.smov)
         savemenu.add_command(label="Save eqdsk"            , command=self.eqdisk)
+        savemenu.add_command(label="Save eqdsk (no CLISTE)", command=self.eqdisk_no_cliste)
         if self.tok == 'AUGD':
             savemenu.add_command(label="Save shotfile (all signals)", command=self.tr2sf)
             savemenu.add_command(label="Save equil shotfile"        , command=self.cdf2tre)
@@ -341,9 +342,14 @@ class VIEWER:
         self.update_plot()
 
 
-    def eqdisk(self):
+    def eqdisk_no_cliste(self):
 
-        import eqdsk, get_sf_grid
+        self.eqdisk(cliste=False)
+
+
+    def eqdisk(self, cliste=True):
+
+        import eqdsk
 
         cdf1d = ['PCUR', 'BZ', 'BZXR', 'RAXIS', 'YAXIS']
         cdf2d = ['PLFLX', 'Q', 'GFUN', 'PMHD_IN']
@@ -357,10 +363,7 @@ class VIEWER:
         cdf_d['n_the'] = '101'
         cdf_d['time']  = self.time[self.jt]
 
-        eq = get_sf_grid.get_grid(self.runid)
-        Rgrid = eq['Ri'][:, 0]
-        zgrid = eq['Zj'][:, 0]
-        rz = ctr2rz_sf.CTR2RZ(self.cdf_file, it=self.jt)
+        rz = ctr2rz_sf.CTR2RZ(self.cdf_file, it=self.jt, cliste=cliste)
 
         data = {}
         for lbl in cdf1d + cdf2d + coord:
@@ -383,8 +386,8 @@ class VIEWER:
         dPres = np.gradient(Pres)/dpsi
 
         eqd_d = {}
-        eqd_d['Rgrid']   = Rgrid
-        eqd_d['zgrid']   = zgrid
+        eqd_d['Rgrid']   = rz.Rgrid
+        eqd_d['zgrid']   = rz.Zgrid
         eqd_d['Raxis']   = 0.01*data['RAXIS']
         eqd_d['zaxis']   = 0.01*data['YAXIS']
         eqd_d['psi_ax']  = pfl[0]
