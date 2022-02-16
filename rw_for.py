@@ -1,3 +1,5 @@
+import numpy as np
+
 def wr_for(arr_in, fmt='%13.6E', n_lin=6):
 
     arr_flat = arr_in.T.ravel()
@@ -23,3 +25,14 @@ def ssplit(ll):
     a = [float(i) for i in slist]
 
     return a
+
+
+def lines2fltarr(lines, dtyp=None):
+
+    data = []
+    for line in lines:
+        data += ssplit(line)
+    if dtyp is None:
+        dtyp = np.float32
+
+    return np.array(data, dtype=dtyp)

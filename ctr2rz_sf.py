@@ -32,6 +32,7 @@ class CTR2RZ:
 # Using m
 
         runid = cdf_file[-12:-4]
+        self.shot = runid[:5]
 
 # Read TRANSP output
 
@@ -52,7 +53,7 @@ class CTR2RZ:
         xb = cv['XB'][it]
         n_xb = len(xb)
 
-        pf1d = -2.*np.pi*cv['PLFLX'][it]
+        pf1d = 2.*np.pi*cv['PLFLX'][it] # Weber, as CLISTE
         fpol = -0.01*cv['GFUN'][it]*cv['BZXR'][it]    # vs XB; BZXR cm -> m
 
 # Expanding contours from Fourier moments
@@ -69,6 +70,8 @@ class CTR2RZ:
 
         if cliste:
             eq = get_sf_grid.get_grid(runid)
+            if eq is None:
+                return
             self.Rgrid = eq['Ri'][:, 0] 
             self.Zgrid = eq['Zj'][:, 0]
             nr = len(self.Rgrid)
@@ -85,7 +88,7 @@ class CTR2RZ:
             Rmax = max(self.Rsurf[-1]) + 0.02
             Zmin = min(self.Zsurf[-1]) - 0.02
             Zmax = max(self.Zsurf[-1]) + 0.02
-            nr = int((Rmax - Rmin)/0.02) # 2 cm steps
+            nr = len(xb) + 1
             nz = int((Zmax - Zmin)/0.02)
             self.Rgrid = np.linspace(Rmin, Rmax, nr)
             self.Zgrid = np.linspace(Zmin, Zmax, nz)
@@ -135,9 +138,10 @@ class CTR2RZ:
 
         dR  = np.gradient(self.Rgrid)
         dz  = np.gradient(self.Zgrid)
-
-        d_dr = np.gradient(self.pfm, axis=0)/dR[:, None]
-        d_dz = np.gradient(self.pfm, axis=1)/dz[None, :]
+        d_dr = np.apply_along_axis(np.gradient, 0, self.pfm)/dR[:, None]
+        d_dz = np.apply_along_axis(np.gradient, 1, self.pfm)/dz[None, :]
+#        d_dr = np.gradient(self.pfm, axis=0)/dR[:, None]
+#        d_dz = np.gradient(self.pfm, axis=1)/dz[None, :]
         self.b_z =  .5/np.pi*d_dz/self.Rgrid[:, None]
         self.b_r = -.5/np.pi*d_dr/self.Rgrid[:, None]
         self.b_t = -self.rbp/self.Rgrid[:, None]

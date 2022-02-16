@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, os
+import sys, os, logging
 
 try:
     import Tkinter as tk
@@ -23,6 +23,15 @@ except:
 
 from matplotlib.figure import Figure
 from scipy.io import netcdf
+
+
+fmt = logging.Formatter('%(asctime)s | %(name)s | %(levelname)s: %(message)s', '%H:%M:%S')
+hnd = logging.StreamHandler()
+hnd.setFormatter(fmt)
+logger = logging.getLogger('cdfplayer')
+logger.addHandler(hnd)
+#logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 def to_str(str_or_byt):
@@ -57,7 +66,7 @@ class VIEWER:
 
 # Widget frame
 
-        print('Setting GUI frame')
+        logger.debug('Setting GUI frame')
         self.viewframe = tk.Tk()
         xmax = self.viewframe.winfo_screenwidth()
         ymax = self.viewframe.winfo_screenheight()
@@ -189,15 +198,15 @@ class VIEWER:
     def read(self, f_cdf):
 
         if not os.path.isfile(f_cdf):
-            print('NetCDF file %s not found' %f_cdf)
+            logger.error('NetCDF file %s not found', f_cdf)
             return
 
         if hasattr(self, 'surf'):
             del self.surf
-        print('Reading profiles from %s' %f_cdf)
+        logger.info('Reading profiles from %s', f_cdf)
         self.cv = netcdf.netcdf_file(f_cdf, 'r', mmap=False).variables
 
-        print('Reading equilibrium from %s' %f_cdf)
+        logger.info('Reading equilibrium from %s', f_cdf)
         rho = np.linspace(0.1, 1.0, 10)
         if 'TIME3' in self.cv.keys():
             self.surf = tr_read_ctr.TR_READ_CTR(f_cdf, rho=rho, nthe=201, endpoint=True)
@@ -209,12 +218,12 @@ class VIEWER:
         self.equline = {}
         self.line1d  = {}
         self.line2d  = {}
-        print('list_file', self.list_file)
+        logger.debug('list_file %s', self.list_file)
         if os.path.isfile(self.list_file) and pr_list is None:
             f = open(self.list_file)
             pr_list = [s.strip() for s in f.readlines()]
             f.close()
-            print('Using profile list from file %s' %self.list_file)
+            logger.info('Using profile list from file %s', self.list_file)
         elif pr_list is None:
             pr_list = ['CUR', 'TE', 'NE', 'V', 'BPOL', 'NEUTT', 'NIMP', 'PINJ', 'TAUEA']
  
@@ -242,13 +251,13 @@ class VIEWER:
                 else:
                     self.trace_list.append(sig)
             else:
-                print('No variable %s in CDF file, ignoring!' %sig)
+                logger.warning('No variable %s in CDF file, ignoring!', sig)
 
         if len(self.trace_list) > 15:
-            print('Too many time traces, taking only the first 15')
+            logger.warning('Too many time traces, taking only the first 15')
             self.trace_list = self.trace_list[:15]
         if len(self.prof_list) > 15:
-            print('Too many profiles, taking only the first 15')
+            logger.warning('Too many profiles, taking only the first 15')
             self.prof_list = self.prof_list[:15]
         nrow = 3
         ncol = 5
@@ -262,8 +271,8 @@ class VIEWER:
             self.R = self.cv['Rsurf'].data
             self.Z = self.cv['Zsurf'].data
         self.n_rho = self.R.shape[1]
-        print('Nrho_eq = %d' %self.n_rho)
-        print(self.R.shape)
+        logger.debug('Nrho_eq = %d' %self.n_rho)
+        logger.debug(self.R.shape)
 # Plots
 
         fsize = 12
@@ -359,12 +368,14 @@ class VIEWER:
 # Psi(R, z), j(R, z)
 #==================
 
-        cdf_d = {}
-        cdf_d['n_the'] = '101'
-        cdf_d['time']  = self.time[self.jt]
+        t_in = self.time[self.jt]
 
         rz = ctr2rz_sf.CTR2RZ(self.cdf_file, it=self.jt, cliste=cliste)
 
+        if not hasattr(rz, 'Rgrid'):
+            logger.error('No related CLISTE shotfile found -> no eqdsk file written')
+            logger.error('Try "Output->Save eqdsk (no CLISTE)"')
+            return
         data = {}
         for lbl in cdf1d + cdf2d + coord:
             data[lbl] = self.cv[lbl].data[self.jt]
@@ -374,39 +385,47 @@ class VIEWER:
         xb_grid = np.append(0, data['XB'])
         n_xb = len(xb_grid)
 
-        pfl  = np.append(0, data['PLFLX'])
+        pfl  = np.append(0, 2*np.pi*data['PLFLX'])
         qpsi = np.interp(xb_grid, data['XB'], data['Q'])
         fpol = np.interp(xb_grid, data['XB'], data['fpol'])
         Pres = np.interp(xb_grid, data['X'] , data['PMHD_IN'])
 
 # Derivatives d/dPsi
+        coco_fac = -1/(2.*np.pi)
 
-        dpsi  = np.gradient(pfl)
+        dpsi  = np.gradient(pfl*coco_fac)
         dfpol = np.gradient(fpol)/dpsi
         dPres = np.gradient(Pres)/dpsi
 
-        eqd_d = {}
-        eqd_d['Rgrid']   = rz.Rgrid
-        eqd_d['zgrid']   = rz.Zgrid
-        eqd_d['Raxis']   = 0.01*data['RAXIS']
-        eqd_d['zaxis']   = 0.01*data['YAXIS']
-        eqd_d['psi_ax']  = pfl[0]
-        eqd_d['psi_bdy'] = pfl[-1]
-        eqd_d['Ipl']     = data['PCUR']
-        eqd_d['bcentr']  = data['BZ']
-        eqd_d['rcentr']  = 0.01*data['BZXR']/eqd_d['bcentr']
-        eqd_d['qpsi']    = qpsi
-        eqd_d['PFL']     = pfl
-        eqd_d['fpol']    = fpol
-        eqd_d['pres']    = Pres
-        eqd_d['fprim']   = dfpol
-        eqd_d['pprim']   = dPres
-        eqd_d['r_bdy']   = 0.01*self.R[self.jt, -1, :]
-        eqd_d['z_bdy']   = 0.01*self.Z[self.jt, -1, :]
-        eqd_d['psi']     = -rz.pfm/(2.*np.pi)
+        GEQ = {}
+        GEQ['NW'] = len(rz.Rgrid)
+        GEQ['NH'] = len(rz.Zgrid)
+        GEQ['RLEFT']   = rz.Rgrid[0]
+        GEQ['ZMID']    = 0.5*(rz.Zgrid[0] + rz.Zgrid[-1])
+        GEQ['RDIM']    = rz.Rgrid[-1] - rz.Rgrid[0]
+        GEQ['ZDIM']    = rz.Zgrid[-1] - rz.Zgrid[0]
+        GEQ['RMAXIS']  = data['RAXIS']
+        GEQ['ZMAXIS']  = data['YAXIS']
+        GEQ['SIMAG']   = pfl[0]  * coco_fac
+        GEQ['SIBRY']   = pfl[-1] * coco_fac
+        GEQ['CURRENT'] = data['PCUR']
+        GEQ['BCENTR']  = data['BZ']
+        GEQ['RCENTR']  = data['BZXR']/GEQ['BCENTR']
+        GEQ['QPSI']    = qpsi
+        GEQ['FPOL']    = fpol
+        GEQ['PRES']    = Pres
+        GEQ['FFPRIM']  = dfpol
+        GEQ['PPRIME']  = dPres
+        GEQ['RBBBS']   = self.R[self.jt, -1, :]
+        GEQ['ZBBBS']   = self.Z[self.jt, -1, :]
+        GEQ['PSIRZ']   = rz.pfm * coco_fac
+        GEQ['CASE']    = np.array(['  TRANSP ', '    ', '   ', ' #' + str(rz.shot), '  %.2fs' % t_in, ' '], dtype='<U8')
+        for key in ('RMAXIS', 'ZMAXIS', 'RCENTR', 'RBBBS', 'ZBBBS'):
+            GEQ[key] = 0.01*GEQ[key]
 
         f_eqdsk = self.cdf_file.replace('.CDF', '.eqdsk')
-        eqdsk.write_eqdsk(eqd_d, f_eqdsk, self.time[self.jt], f_cdf=self.cdf_file)
+        eqd = eqdsk.EQDSK(GEQ=GEQ)
+        eqd.write(f_eqdsk)
 
 
     def uf1t(self):
@@ -490,7 +509,7 @@ class VIEWER:
             self.update_plot()
             jstr = (fmt % self.jt).replace(' ', '0')
             fout = '%s-%s.png' %(self.runid, jstr)
-            print('Stored %s' %fout)
+            logger.debug('Stored %s', fout)
             self.viewfig.savefig(fout, dpi=100)
 
 # Concatenate png's to avi
@@ -511,7 +530,7 @@ class VIEWER:
         encoder = '/afs/@cell/common/soft/visualization/mencoder/svn-2011-05-17/@sys/bin/mencoder'
         os.spawnvp(os.P_WAIT, encoder, command)
         os.system('rm *.png')
-        print('Stored movie %s' %out_mov)
+        logger.debug('Stored movie %s', out_mov)
 
 
     def update_plot(self, reset=True):
@@ -657,7 +676,7 @@ class VIEWER:
         try:
             self.set_plots(pr_list=newsigs)
         except ValueError:
-            print('Error!')
+            logger.error('Error!')
             self.prof_list  = oldprofiles
             self.trace_list = oldtraces
         self.topl.destroy()

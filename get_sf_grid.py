@@ -33,5 +33,7 @@ def get_grid(runid):
     if equ.status:
         for obj in ('PFM', 'Ri', 'Zj', 'PFxx', 'time', 'ixti'):
             eq_d[obj] = equ.getobject(obj)
+        return eq_d
+    else:
+        return None
 
-    return eq_d

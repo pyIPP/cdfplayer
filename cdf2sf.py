@@ -1,18 +1,72 @@
 # Used in cdfplayer
-import sys
-sys.path.append('/afs/ipp/aug/ads-diags/common/python/lib')
-import os, shutil
+import os
 from scipy.io import netcdf
 import numpy as np
 import aug_sfutils as sf
-import sfhmod, ctr2rz_sf, get_sf_grid, tr_read_ctr
+from aug_sfutils import sfhmod
+import parse_nml, ctr2rz_sf, get_sf_grid, tr_read_ctr
 
 ww = sf.WW()
 
-#import ww_20180130 
-#ww = ww_20180130.shotfile()
 
-sfh = sf.SFH()
+def sfh_mod(cdf_file, nml=None, fsfh_in=None, fsfh_out=None):
+
+
+    sfh = sfhmod.SFHMOD(fin=fsfh_in)
+
+    runid = os.path.split(cdf_file)[1][:8]
+    cv = netcdf.netcdf_file(cdf_file, 'r', mmap=False).variables
+    sfh_d = {}
+
+    sfo = sfh.sfo
+
+    tbases  = [ lbl for lbl in sfo.sfh.keys() if sfo.sfh[lbl].obj_type ==  8 ]
+    abases  = [ lbl for lbl in sfo.sfh.keys() if sfo.sfh[lbl].obj_type == 13 ]
+
+    for obj in tbases:
+        nt_cdf = cv[obj].shape[0]
+        sfh.modtimeall(obj, nt_cdf)
+
+    for obj in abases:
+        if obj in cv.keys():
+            nx_cdf = cv[obj].shape[-1]
+            sfh.modareaall(obj, nx_cdf)
+
+    for obj in sfo.parsets:
+        if nml is None:
+            print('Parameter sets not read from any namelist')
+        else: # Read values from namelist
+            parset = sfo.getparset(obj)
+            sfh_d[obj] = {}
+            for pn, val in parset.items():
+                if pn == 'runid':
+                    sfh_d[obj][pn] = [runid]
+                else:
+                    sfh_d[obj][pn] = parse_nml.parsenml(nml, pn, fmt=val.data_format)
+
+    for obj in sfo.objects:
+
+        name_flg = False
+        if obj in cv.keys():
+            name_flg = True
+            cdfobj = obj
+        else:
+            if len(obj) == 8:
+                name_flg = False
+                for cdfobj in cv.keys():
+                    if obj in cdfobj:
+                        print('CDF signal %s stored as shotfile %s' %(cdfobj, obj))
+                        name_flg = True
+                        break
+
+        if name_flg:
+            sfh_d[obj] = cv[cdfobj].data
+        else:
+            print('Signal %s not found in %s' %(obj, cdf_file))
+
+    sfh.write(fout=fsfh_out)
+
+    return sfh_d
 
 
 def cdf2tre(runid, time=-1):
@@ -25,14 +79,7 @@ def cdf2tre(runid, time=-1):
     tail = runid[5:8]
     fcdf = '%s/%d/%s/%s.CDF' %(sfhdir, nshot, tail, runid)
     fsfh = '%s/TRE00000.sfh' %sfhdir
-    if not os.path.isfile(fcdf):
-        print('%s not found' %fcdf)
-        return
-    try:
-        shutil.copy2(source, fsfh)
-    except:
-        print('Unable to copy file %s to %s' %(source, fsfh))
-        return
+
     cv = netcdf.netcdf_file(fcdf, 'r', mmap=False).variables
 
 # Parameters
@@ -242,19 +289,14 @@ def cdf2tre(runid, time=-1):
 
     sig_gr = sig3d + prof1 + prof2 + mixed + specs + switch
 
-    err = sfh.Open(fsfh)
-    if err == 0:
-        for lbl in sig1d:
-            print('SFHmod %s' %lbl)
-            sfh.Modtim(lbl, nt)
-        for lbl in sig_gr:
-            print('SFHmod %s' %lbl)
-            dims = tre[lbl].shape
-            sfh.Modsgr(lbl, dims)
-        sfh.Modsgr('SSQ', (n_ssq, nt))
-        sfh.Close()
-    else:
-        print('Error=', err)
+    sfh = sfhmod.SFHMOD(fin=source)
+    sfh.modtime('time', nt)
+    sfh.modtime('ixti', nt)
+    for lbl in sig_gr:
+        print('Sfh_Mod %s' %lbl)
+        dims = tre[lbl].shape
+        sfh.modindex(lbl, dims)
+    sfh.write(fout=fsfh)
 
 # Write TRE shotfile
 
@@ -310,15 +352,9 @@ def cdf2tra(runid):
         if not os.path.isfile(fname):
             print('%s not found' %fname)
             return
-    try:
-        shutil.copy2(source, fsfh)
-        print('Copied %s to %s' %(source, fsfh))
-    except:
-        print('Unable to copy file %s to %s' %(source, fsfh))
-        return
-    sfh_dic = sfhmod.sfhmod(fcdf, nml=fnml, fsfh=fsfh)
+
+    sfh_dic = sfh_mod(fcdf, nml=fnml, fsfh_in=source, fsfh_out=fsfh)
     sf.write_sf(nshot, sfh_dic, sfhdir, 'TRA', exp=os.getenv('USER'))
-#    ww_20180130.write_sf(nshot, sfh_dic, sfhdir, 'TRA', exp=os.getenv('USER'))
 
 
 def cdf2nub(runid):
@@ -332,16 +368,8 @@ def cdf2nub(runid):
     fcdf = '%s/%d/%s/%s.cdf' %(sfhdir, nshot, tail, runid)
     fnml = '%s/%d/%s.nml'    %(sfhdir, nshot, runid)
     fsfh = '%s/NUB00000.sfh' %sfhdir
-    for fname in fcdf, fnml:
-        if not os.path.isfile(fname):
-            print('%s not found' %fname)
-            return
-    try:
-        shutil.copy2(source, fsfh)
-    except:
-        print('Unable to copy file %s to %s' %(source, fsfh))
-        return
-    sfh_dic = sfh_20180130.sfhmod(fcdf, nml=fnml, fsfh=fsfh)
+
+    sfh_dic = sfh_mod(fcdf, nml=fnml, fsfh_in=source, fsfh_out=fsfh)
     sf.write_sf(nshot, sfh_dic, sfhdir, 'NUB', exp=os.getenv('USER'))
 
 
