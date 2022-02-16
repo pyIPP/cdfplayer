@@ -433,14 +433,15 @@ class VIEWER:
         self.ff = False
         self.rw = False
 
-        sshot = self.runid[0:5]
-        tlbl = 'Time:'.ljust(20) + 's'
+        uf = ufiles.UFILE()
+        uf.pre = 'A'
+        uf.shot = self.runid[0:5]
+        uf.X = {'label': 'Time:'.ljust(20) + 's', 'data': self.time}
         for trace in self.trace_list:
-            dlbl = trace.ljust(20) + self.unit[trace].strip()
-            uf_d = { 'pre':'A', 'ext':trace, 'shot':sshot, \
-                     'grid': {'X': {'lbl':tlbl, 'arr':self.time} }, \
-                     'data': {'lbl': dlbl, 'arr': self.cv[trace][:]} }
-            ufiles.WU(uf_d)
+            uf.ext = trace
+            uf.f['label'] = trace.ljust(20) + self.unit[trace].strip()
+            uf.f['data']  = self.cv[trace][:]
+            uf.write()
 
 
     def uf1r(self):
@@ -448,40 +449,43 @@ class VIEWER:
         self.ff = False
         self.rw = False
 
-        sshot = self.runid[0:5]
-        xlbl = 'rho_tor'
+        uf = ufiles.UFILE()
+        uf.pre = 'A'
+        uf.shot = self.runid[0:5]
+        uf.X = {'label': 'rho_tor'}
+
         for prof in self.prof_list:
+            uf.ext = prof
             if 'XB' in self.dim[prof]:
-                xrho = self.rhob
+                uf.X['data'] = self.rhob
             else:
-                xrho = self.rho
-            dlbl = prof.ljust(20) + self.unit[prof].strip()
-            uf_d = { 'pre': 'A', 'ext': prof, 'shot': sshot, \
-                     'scal': [['Time:'.ljust(20) + 's', self.time[self.jt]]], 
-                     'grid': {'X': {'lbl': xlbl, 'arr': xrho} }, \
-                     'data': {'lbl': dlbl, 'arr': self.cv[prof][self.jt, :]} }
-            ufiles.WU(uf_d)
+                uf.X['data'] = self.rho            
+            uf.f['label'] = prof.ljust(20) + self.unit[prof].strip()
+            uf.f['data']  = self.cv[prof][self.jt, :]
+            uf.scalar = [{ 'label': 'Time:'.ljust(20) + 's', 'data': self.time[self.jt] }]
+            uf.write()
 
 
     def uf2(self):
 
         self.ff = False
         self.rw = False
-        
-        sshot = self.runid[0:5]
-        tlbl = 'Time'.ljust(20) + 'Seconds'
-        xlbl = 'rho_tor'
+
+        uf = ufiles.UFILE()
+        uf.pre = 'A'
+        uf.shot = self.runid[0:5]
+        uf.X = {'label': 'Time'.ljust(20) + 'Seconds', 'data': self.time}
+        uf.Y = {'label': 'rho_tor'}
+
         for prof in self.prof_list:
             if 'XB' in self.dim[prof]:
-                xrho = self.rhob
+                uf.Y['data'] = self.rhob
             else:
-                xrho = self.rho
-            dlbl = prof.ljust(20) + self.unit[prof].rstrip()
-            uf_d = { 'pre': 'A', 'ext': prof + '2', 'shot': sshot, \
-                     'grid': {'X':{'lbl': tlbl, 'arr': self.time}, \
-                              'Y':{'lbl': xlbl, 'arr': xrho} }, \
-                     'data': {'lbl': dlbl, 'arr': self.cv[prof].data} }
-            ufiles.WU(uf_d)
+                uf.Y['data'] = self.rho
+            uf.ext = prof + '2'
+            uf.f['label'] = prof.ljust(20) + self.unit[prof].rstrip()
+            uf.f['data']  = self.cv[prof].data
+            uf.write()
 
 
     def cdf2tre(self):
