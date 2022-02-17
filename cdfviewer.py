@@ -424,8 +424,8 @@ class VIEWER:
             GEQ[key] = 0.01*GEQ[key]
 
         f_eqdsk = self.cdf_file.replace('.CDF', '.eqdsk')
-        eqd = eqdsk.EQDSK(GEQ=GEQ)
-        eqd.write(f_eqdsk)
+        eqd = eqdsk.EQDSK()
+        eqd.write(f_eqdsk, geq=GEQ)
 
 
     def uf1t(self):

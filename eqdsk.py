@@ -34,54 +34,11 @@ for key, val in sigma.items():
 class EQDSK(dict):
 
 
-    def __init__(self, GEQ=None):
+    def __init__(self, fin=None):
 
-        if GEQ is None:
-            self.__dict__ = self
-        else:
-            self.__dict__ = GEQ
-
-
-    def write(self, f_eqdsk):
-
-        mixed = ('FPOL', 'PRES', 'FFPRIM', 'PPRIME')
-
-        fmt  = '%16.9E'
-        nlin = 5
-        format_str = (fmt * 5 + '\n')
-        xdum = 0.
-        idum = 0
-
-        f = open(f_eqdsk,  'w')
-# Scalars
-        f.write('%s%s%s%s%s%s %d %d %d\n' %(*self.CASE, idum, self.NW, self.NH) )
-        f.write( format_str % (self.RDIM, self.ZDIM, self.RMAXIS, self.RLEFT, self.ZMID) )
-        f.write( format_str % (self.RMAXIS, self.ZMAXIS, self.SIMAG, self.SIBRY, self.BCENTR) )
-        f.write( format_str % (self.CURRENT, self.SIMAG, xdum, self.RMAXIS, xdum) )
-        f.write( format_str % (self.ZMAXIS, xdum, self.SIBRY, xdum, xdum) )
-# Profiles
-        f.write( rw_for.wr_for(self.FPOL  , fmt=fmt, n_lin=nlin) )
-        f.write( rw_for.wr_for(self.PRES  , fmt=fmt, n_lin=nlin) )
-        f.write( rw_for.wr_for(self.FFPRIM, fmt=fmt, n_lin=nlin) )
-        f.write( rw_for.wr_for(self.PPRIME, fmt=fmt, n_lin=nlin) )
-        f.write( rw_for.wr_for(self.PSIRZ , fmt=fmt, n_lin=nlin) ) # Matrix
-        f.write( rw_for.wr_for(self.QPSI  , fmt=fmt, n_lin=nlin) )
-
-        if not hasattr(self, 'RLIM'):
-            self.RLIM = 0.01*np.array(Rlim_aug)
-            self.ZLIM = 0.01*np.array(Zlim_aug)
-        n_lim = len(self.RLIM)
-        n_the = len(self.RBBBS)
-        f.write( '%5i%5i\n' % (n_the, n_lim) )
-        tmp = np.append(self.RBBBS, self.ZBBBS)
-        rz  = tmp.reshape(2,  n_the)
-        f.write( rw_for.wr_for(rz, fmt=fmt, n_lin=nlin) )
-        tmp = np.append(np.array(self.RLIM), np.array(self.ZLIM))
-        rz2 = tmp.reshape(2,  n_lim)
-        f.write( rw_for.wr_for(rz2, fmt=fmt, n_lin=nlin) )
-        f.close()
-
-        logger.info('Output stored in %s' %f_eqdsk)
+        self.__dict__ = self
+        if fin is not None:
+            self.read(fin)
 
 
     def read(self, f_eqdsk):
@@ -127,6 +84,51 @@ class EQDSK(dict):
         print(self.NW, self.NH, self.NW*self.NH, data[jprof_end-1])
         print(self.QPSI)
         self.get_coco()
+
+
+    def write(self, f_eqdsk, geq=None):
+
+        if geq is not None:
+            self.__dict__ = geq
+
+        mixed = ('FPOL', 'PRES', 'FFPRIM', 'PPRIME')
+
+        fmt  = '%16.9E'
+        nlin = 5
+        format_str = (fmt * 5 + '\n')
+        xdum = 0.
+        idum = 0
+
+        f = open(f_eqdsk,  'w')
+# Scalars
+        f.write('%s%s%s%s%s%s %d %d %d\n' %(*self.CASE, idum, self.NW, self.NH) )
+        f.write( format_str % (self.RDIM, self.ZDIM, self.RMAXIS, self.RLEFT, self.ZMID) )
+        f.write( format_str % (self.RMAXIS, self.ZMAXIS, self.SIMAG, self.SIBRY, self.BCENTR) )
+        f.write( format_str % (self.CURRENT, self.SIMAG, xdum, self.RMAXIS, xdum) )
+        f.write( format_str % (self.ZMAXIS, xdum, self.SIBRY, xdum, xdum) )
+# Profiles
+        f.write( rw_for.wr_for(self.FPOL  , fmt=fmt, n_lin=nlin) )
+        f.write( rw_for.wr_for(self.PRES  , fmt=fmt, n_lin=nlin) )
+        f.write( rw_for.wr_for(self.FFPRIM, fmt=fmt, n_lin=nlin) )
+        f.write( rw_for.wr_for(self.PPRIME, fmt=fmt, n_lin=nlin) )
+        f.write( rw_for.wr_for(self.PSIRZ , fmt=fmt, n_lin=nlin) ) # Matrix
+        f.write( rw_for.wr_for(self.QPSI  , fmt=fmt, n_lin=nlin) )
+
+        if not hasattr(self, 'RLIM'):
+            self.RLIM = 0.01*np.array(Rlim_aug)
+            self.ZLIM = 0.01*np.array(Zlim_aug)
+        n_lim = len(self.RLIM)
+        n_the = len(self.RBBBS)
+        f.write( '%5i%5i\n' % (n_the, n_lim) )
+        tmp = np.append(self.RBBBS, self.ZBBBS)
+        rz  = tmp.reshape(2,  n_the)
+        f.write( rw_for.wr_for(rz, fmt=fmt, n_lin=nlin) )
+        tmp = np.append(np.array(self.RLIM), np.array(self.ZLIM))
+        rz2 = tmp.reshape(2,  n_lim)
+        f.write( rw_for.wr_for(rz2, fmt=fmt, n_lin=nlin) )
+        f.close()
+
+        logger.info('Output stored in %s' %f_eqdsk)
 
 
     def plot(self):
