@@ -80,10 +80,7 @@ class EQDSK(dict):
         lim = data[jlim: jlim + 2*nlim]
         self.RLIM = lim[ ::2]
         self.ZLIM = lim[1::2]
-        print('bdy text', nbdy, nlim, jprof_end, jbdy, jlim, len(data))
-        print(self.NW, self.NH, self.NW*self.NH, data[jprof_end-1])
-        print(self.QPSI)
-        self.get_coco()
+        self.find_coco()
 
 
     def write(self, f_eqdsk, geq=None):
@@ -172,32 +169,34 @@ class EQDSK(dict):
         plt.show()
 
 
-    def get_coco(self, ip_shot='ccw', bt_shot='cw'):
+    def find_coco(self, ip_shot='ccw', bt_shot='cw'):
         """
         Returns the COCO number of a given eqdsk object
         """
 
-# dpsi_sign positive if psi_sep > psi0
-        dpsi_sign = np.sign(self.SIBRY - self.SIMAG)
 # Known plasma discharge
         ccw_ip = 1 if (ip_shot == 'ccw') else -1 # AUG default: 1
         ccw_bt = 1 if (bt_shot == 'ccw') else -1 # AUG default: -1
 
 # Table III
-
-        sign_q  = np.sign(np.nanmean(self.QPSI))
-        sign_ip = np.sign(self.CURRENT)
-        sign_bt = np.sign(self.BCENTR)
-        sigma_rphiz = sign_ip*ccw_ip
-        sigma_bp    = dpsi_sign*sign_ip
+# dpsi_sign positive if psi_sep > psi0
+        dpsi_sign = np.sign(self.SIBRY - self.SIMAG)
+        sign_q    = np.sign(np.nanmean(self.QPSI))
+        sign_ip   = np.sign(self.CURRENT)
+        sign_bt   = np.sign(self.BCENTR)
+        logger.debug('dpsi: %d, q: %d, Ip: %d, Bt: %d', dpsi_sign, sign_q, sign_ip, sign_bt)  
+        sigma_rphiz = sign_ip*ccw_ip # If sigma_rphiz>0, ref frame is ccw
+        if sign_bt*ccw_bt != sigma_rphiz:
+            logger.error('Inconsistent sign of Bt')
+        sigma_bp = dpsi_sign*sign_ip
 # Eq 45
         sigma_rhothephi = sign_q*sign_ip*sign_bt
         logger.debug('%d, %d, %d', sigma_bp, sigma_rphiz, sigma_rhothephi)
-        for jc, rhothephi in enumerate(sigma['rhothephi']):
-            if( sigma['bp'   ][jc] == sigma_bp    and \
-                sigma['rphiz'][jc] == sigma_rphiz and \
-                rhothephi          == sigma_rhothephi):
-                self.coco = jc + 1
+        for jc in range(len(sigma['rhothephi'])):
+            if( sigma['bp'   ][jc]     == sigma_bp    and \
+                sigma['rphiz'][jc]     == sigma_rphiz and \
+                sigma['rhothephi'][jc] == sigma_rhothephi):
+                self.cocos = jc + 1
                 break
 
 # Find out 2*pi factor for Psi
@@ -205,22 +204,56 @@ class EQDSK(dict):
         psi1d = np.linspace(self.SIMAG, self.SIBRY, self.NW)
         dpsi = np.gradient(psi1d)
 
-# Radial average
-# It is either q_ratio ~ 1 (COCO > 10) or ~ 2*pi (COCO < 10)
-
         rmin = 0.5*(np.max(self.RBBBS) - np.min(self.RBBBS)) 
         q_estimate = np.abs((np.pi * self.BCENTR * rmin**2) / (self.SIBRY - self.SIMAG))
         qabs = np.abs(self.QPSI[-1])
         if np.abs(q_estimate - qabs) < np.abs(q_estimate/(2*np.pi) - qabs):
-            self.coco += 10
+            self.cocos += 10
         logger.debug('%8.4f %8.4f', np.abs(q_estimate - qabs), np.abs(q_estimate/(2*np.pi) - qabs) )
-        logger.info('COCO number: %d', self.coco)
+        logger.info('COCO number: %d', self.cocos)
+
+
+    def to_coco(self, cocos_out=11, find=True):
+
+        if hasattr(self, 'cococ') and not find:
+            cocos_in = self.cocos
+        else:
+            self.find_coco()
+            cocos_in = self.cocos
+
+        logger.info('COCOS conversion from %d to %d' %(cocos_in, cocos_out))
+        jc_in   = cocos_in %10 - 1
+        jc_out  = cocos_out%10 - 1
+        ebp_in  = cocos_in//10
+        ebp_out = cocos_out//10
+
+# Equation 9, table I, equation 39, 45
+        q_sign   = sigma['rhothephi'][jc_in] * sigma['rhothephi'][jc_out]
+        phi_sign = sigma['rphiz'][jc_in]*sigma['rphiz'][jc_out]
+        psi_sign = sigma['rphiz'][jc_in]*sigma['bp'][jc_in] * sigma['rphiz'][jc_out]*sigma['bp'][jc_out]
+        psi_2pi  = (2.*np.pi)**(ebp_out - ebp_in)
+        psi_fac = psi_sign*psi_2pi
+
+        for key, val in self.__dict__.items():
+            if val is None:
+                continue
+            if key in ('BCENTR', 'FPOL', 'CURRENT'):
+                val *= phi_sign
+            elif key in ('PSIRZ', 'SIMAG', 'SIBRY'):
+                val *= psi_fac
+            elif key in ('PPRIME', 'FFPRIM'):
+                val /= psi_fac
+            elif key in ('QPSI', ):
+                val *= q_sign
 
 
 if __name__ == '__main__':
 
-    feqdsk = '28053_1.2003s.eqdsk'
-    feqdsk = '23076W01.eqdsk'
+    feqdsk = '/afs/ipp/home/g/git/python/maingui/28053_1.2003s.eqdsk'
+#    feqdsk = '23076W01.eqdsk'
     eq = EQDSK()
     eq.read(feqdsk)
+    eq.plot()
+    eq.to_coco(cocos_out=13)
+    eq.find_coco()
     eq.plot()

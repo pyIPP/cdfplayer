@@ -144,8 +144,22 @@ class UFILE(dict):
         self.f['data'] = farr.reshape(dims[::-1]).T
 
 
-    def write(self, udir=None, dev='AUGD', avg_axis=None):
+    def average(self, axis=0):
 
+        self.ext = self.ext + '_AVG%d' %axis
+        if axis == 0:
+            self.X['data'] = np.atleast_1d(np.nanmean(self.X['data']))
+        elif axis == 1:
+            self.Y['data'] = np.atleast_1d(np.nanmean(self.Y['data']))
+        elif axis == 2:
+            self.Z['data'] = np.atleast_1d(np.nanmean(self.Z['data']))
+        tmp = np.nanmean(self.f['data'], axis=axis)
+        shape = list(self.f['data'].shape)
+        shape[axis] = 1
+        self.f['data'] = tmp.reshape(shape)
+
+
+    def write(self, udir=None, dev='AUGD'):
 
         self.shot = int(self.shot)
         s5shot = '%05d' %self.shot
@@ -154,19 +168,6 @@ class UFILE(dict):
             comment = self.comment
         else:
             comment = ''
-
-        if avg_axis is not None:
-            self.ext = self.ext + '_AVG%d' %avg_axis
-            if avg_axis == 0:
-                self.X['data'] = np.atleast_1d(np.nanmean(self.X['data']))
-            elif avg_axis == 1:
-                self.Y['data'] = np.atleast_1d(np.nanmean(self.Y['data']))
-            elif avg_axis == 2:
-                self.Z['data'] = np.atleast_1d(np.nanmean(self.Z['data']))
-            tmp = np.nanmean(self.f['data'], axis=avg_axis)
-            shape = list(self.f['data'].shape)
-            shape[avg_axis] = 1
-            self.f['data'] = tmp.reshape(shape)
 
         if udir is None:
             udir = '%s/udb/%s' %(os.getenv('HOME'), s5shot)
