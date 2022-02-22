@@ -65,7 +65,7 @@ class EQDSK(dict):
         jprof_end = self.NW * (5 + self.NH)
         ind_split = [self.NW, 2*self.NW, 3*self.NW, 4*self.NW, \
             self.NW * (4 + self.NH)]
-        self.FPOL, self.FFPRIM, self.PRES, self.PPRIME, \
+        self.FPOL, self.PRES, self.FFPRIM, self.PPRIME, \
             self.PSIRZ, self.QPSI = np.split(data[: jprof_end], ind_split)
         self.PSIRZ = self.PSIRZ.reshape(self.NH, self.NW).T
 
@@ -138,8 +138,10 @@ class EQDSK(dict):
 
         X, Y = np.meshgrid(Rgrid, Zgrid)
 
-        plt.figure('EQDSK pfm', (7, 8))
-        plt.subplot(1, 1, 1, aspect='equal')
+        plt.figure('EQDSK', (14, 8))
+        plt.subplots_adjust(top=0.95, bottom=0.1, left=0.1, right=0.95, hspace=0, wspace=0.5)
+
+        plt.subplot2grid((5, 2), (0, 0), rowspan=5, aspect='equal')
         plt.contourf(X, Y, self.PSIRZ.T, levels=20)
         plt.colorbar()
         plt.xlabel('R [m]')
@@ -149,22 +151,53 @@ class EQDSK(dict):
         plt.plot(self.RLIM  , self.ZLIM  , 'k-')
         plt.plot(self.RMAXIS, self.ZMAXIS, 'ro')
 
-        plt.figure('EQDSK profs', (10, 8))
-        plt.subplot(3, 2, 1)
-        plt.plot(psi_grid[:-1], self.FPOL[:-1])
-        plt.title('F')
-        plt.subplot(3, 2, 2)
-        plt.plot(psi_grid[:-1], self.FFPRIM[:-1])
-        plt.title('dF/dpsi')
-        plt.subplot(3, 2, 3)
-        plt.plot(psi_grid[:-1], self.PRES[:-1])
-        plt.title('Pres')
-        plt.subplot(3, 2, 4)
-        plt.plot(psi_grid[:-1], self.PPRIME[:-1])
-        plt.title('dPres/dpsi')
-        plt.subplot(3, 2, 5)
-        plt.plot(psi_grid[:-1], self.QPSI[:-1])
-        plt.title('Saf. factor')
+        plt.subplot2grid((5, 2), (0, 1))
+        plt.plot(psi_grid, self.FPOL)
+        plt.ylabel('F')
+        axp = plt.gca()
+        axp.tick_params(axis='x', which='both', bottom='on', top='on', labelbottom='off')
+        axp.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
+        axp.yaxis.major.formatter._useMathText = True
+
+        plt.subplot2grid((5, 2), (1, 1))
+        plt.plot(psi_grid, self.FFPRIM)
+        plt.ylabel('dF/dpsi')
+        axp = plt.gca()
+        axp.tick_params(axis='x', which='both', bottom='on', top='on', labelbottom='off')
+        axp.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
+        axp.yaxis.major.formatter._useMathText = True
+
+        plt.subplot2grid((5, 2), (2, 1))
+        plt.plot(psi_grid, self.PRES)
+        plt.ylabel('Pres [Pa]')
+        axp = plt.gca()
+        axp.tick_params(axis='x', which='both', bottom='on', top='on', labelbottom='off')
+        axp.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
+        axp.yaxis.major.formatter._useMathText = True
+
+        dpsi = psi_grid[1] - psi_grid[0]
+        dp_dpsi = np.gradient(self.PRES)/dpsi
+        print(dpsi)
+        print(dp_dpsi)
+        plt.subplot2grid((5, 2), (3, 1))
+        plt.plot(psi_grid, self.PPRIME)
+        plt.ylabel('dPres/dpsi')
+        axp = plt.gca()
+        axp.tick_params(axis='x', which='both', bottom='on', top='on', labelbottom='off')
+        axp.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
+        axp.yaxis.major.formatter._useMathText = True
+
+        if not hasattr(self, 'cocos'):
+            self.find_coco()
+        if self.cocos < 10:
+            unit = 'Weber/rad'
+        else:
+            unit = 'Weber'
+
+        plt.subplot2grid((5, 2), (4, 1))
+        plt.plot(psi_grid, self.QPSI)
+        plt.ylabel('Saf. factor')
+        plt.xlabel(r'$\Psi$ [%s]' %unit)
 
         plt.show()
 
@@ -249,7 +282,7 @@ class EQDSK(dict):
 
 if __name__ == '__main__':
 
-    feqdsk = '/afs/ipp/home/g/git/python/maingui/28053_1.2003s.eqdsk'
+    feqdsk = '/afs/ipp/home/g/git/python/maingui/28053_1.2003s.eqdsk17'
 #    feqdsk = '23076W01.eqdsk'
     eq = EQDSK()
     eq.read(feqdsk)
