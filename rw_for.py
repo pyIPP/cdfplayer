@@ -36,3 +36,16 @@ def lines2fltarr(lines, dtyp=None):
         dtyp = np.float32
 
     return np.array(data, dtype=dtyp)
+
+
+def fltarr_len(lines, nx, dtyp=None):
+
+    data = []
+    for jlin, line in enumerate(lines):
+        data += ssplit(line)
+        if len(data) >= nx:
+            break
+    if dtyp is None:
+        dtyp = np.float32
+
+    return jlin+1, np.array(data, dtype=dtyp)

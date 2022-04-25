@@ -80,6 +80,9 @@ class EQDSK(dict):
         lim = data[jlim: jlim + 2*nlim]
         self.RLIM = lim[ ::2]
         self.ZLIM = lim[1::2]
+        self.Rgrid = np.linspace(self.RLEFT, self.RLEFT + self.RDIM, self.NW)
+        self.Zgrid = np.linspace(self.ZMID - 0.5*self.ZDIM, self.ZMID + 0.5*self.ZDIM, self.NH)
+        self.psi1d = np.linspace(self.SIMAG, self.SIBRY, self.NW)
         self.find_coco()
 
 
@@ -98,7 +101,10 @@ class EQDSK(dict):
 
         f = open(f_eqdsk,  'w')
 # Scalars
-        f.write('%s%s%s%s%s%s %d %d %d\n' %(*self.CASE, idum, self.NW, self.NH) )
+        if hasattr(self, 'CASE2'):
+            f.write('%s %d %d %d\n' %(self.CASE2, idum, self.NW, self.NH) )
+        else:
+            f.write('%s%s%s%s%s%s %d %d %d\n' %(*self.CASE, idum, self.NW, self.NH) )
         f.write( format_str % (self.RDIM, self.ZDIM, self.RMAXIS, self.RLEFT, self.ZMID) )
         f.write( format_str % (self.RMAXIS, self.ZMAXIS, self.SIMAG, self.SIBRY, self.BCENTR) )
         f.write( format_str % (self.CURRENT, self.SIMAG, xdum, self.RMAXIS, xdum) )
@@ -131,18 +137,17 @@ class EQDSK(dict):
     def plot(self):
 
         import matplotlib.pylab as plt
+        from matplotlib import cm
 
-        Rgrid = np.linspace(self.RLEFT, self.RLEFT + self.RDIM, self.NW)
-        Zgrid = np.linspace(self.ZMID - 0.5*self.ZDIM, self.ZMID + 0.5*self.ZDIM, self.NH)
         psi_grid = np.linspace(self.SIMAG, self.SIBRY, self.NW)
 
-        X, Y = np.meshgrid(Rgrid, Zgrid)
+        X, Y = np.meshgrid(self.Rgrid, self.Zgrid)
 
         plt.figure('EQDSK', (14, 8))
         plt.subplots_adjust(top=0.95, bottom=0.1, left=0.1, right=0.95, hspace=0, wspace=0.5)
 
         plt.subplot2grid((5, 2), (0, 0), rowspan=5, aspect='equal')
-        plt.contourf(X, Y, self.PSIRZ.T, levels=20)
+        plt.contourf(X, Y, self.PSIRZ.T, levels=20, cmap=cm.jet)
         plt.colorbar()
         plt.xlabel('R [m]')
         plt.ylabel('Z [m]')
@@ -175,10 +180,6 @@ class EQDSK(dict):
         axp.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
         axp.yaxis.major.formatter._useMathText = True
 
-        dpsi = psi_grid[1] - psi_grid[0]
-        dp_dpsi = np.gradient(self.PRES)/dpsi
-        print(dpsi)
-        print(dp_dpsi)
         plt.subplot2grid((5, 2), (3, 1))
         plt.plot(psi_grid, self.PPRIME)
         plt.ylabel('dPres/dpsi')
@@ -208,8 +209,8 @@ class EQDSK(dict):
         """
 
 # Known plasma discharge
-        ccw_ip = 1 if (ip_shot == 'ccw') else -1 # AUG default: 1
-        ccw_bt = 1 if (bt_shot == 'ccw') else -1 # AUG default: -1
+        self.ip_ccw = 1 if (ip_shot == 'ccw') else -1 # AUG default: 1
+        self.bt_ccw = 1 if (bt_shot == 'ccw') else -1 # AUG default: -1
 
 # Table III
 # dpsi_sign positive if psi_sep > psi0
@@ -218,8 +219,8 @@ class EQDSK(dict):
         sign_ip   = np.sign(self.CURRENT)
         sign_bt   = np.sign(self.BCENTR)
         logger.debug('dpsi: %d, q: %d, Ip: %d, Bt: %d', dpsi_sign, sign_q, sign_ip, sign_bt)  
-        sigma_rphiz = sign_ip*ccw_ip # If sigma_rphiz>0, ref frame is ccw
-        if sign_bt*ccw_bt != sigma_rphiz:
+        sigma_rphiz = sign_ip*self.ip_ccw # If sigma_rphiz>0, ref frame is ccw
+        if sign_bt*self.bt_ccw != sigma_rphiz:
             logger.error('Inconsistent sign of Bt')
         sigma_bp = dpsi_sign*sign_ip
 # Eq 45
@@ -242,6 +243,14 @@ class EQDSK(dict):
         qabs = np.abs(self.QPSI[-1])
         if np.abs(q_estimate - qabs) < np.abs(q_estimate/(2*np.pi) - qabs):
             self.cocos += 10
+
+        jcoco = self.cocos%10 - 1
+        ebp = self.cocos//10
+        self.psi_sign = -self.ip_ccw*sigma['bp'][jcoco]*sigma['rphiz'][jcoco]
+        psi_2pi  = (2.*np.pi)**ebp
+        self.psi_fac = self.psi_sign*psi_2pi
+        self.phi_sign = self.bt_ccw*sigma['rphiz'][jcoco]
+
         logger.debug('%8.4f %8.4f', np.abs(q_estimate - qabs), np.abs(q_estimate/(2*np.pi) - qabs) )
         logger.info('COCO number: %d', self.cocos)
 
@@ -280,9 +289,27 @@ class EQDSK(dict):
                 val *= q_sign
 
 
+    def brzt(self):
+
+        from scipy.interpolate import interp1d
+
+        dr = (self.Rgrid[-1] - self.Rgrid[0])/float(self.NW - 1)
+        dz = (self.Zgrid[-1] - self.Zgrid[0])/float(self.NH - 1)
+        fBt = interp1d(self.psi1d, self.FPOL, kind='linear', fill_value='extrapolate')
+
+        self.Br = np.apply_along_axis(np.gradient, 1,  self.PSIRZ)/self.Rgrid[:, None]/dr
+        self.Bz = np.apply_along_axis(np.gradient, 0, -self.PSIRZ)/self.Rgrid[:, None]/dz
+        self.Bt = fBt(self.PSIRZ)/self.Rgrid[:, None]
+
+        self.Br /= -abs(self.psi_fac)
+        self.Bz /= -abs(self.psi_fac)
+        self.Bt *= -2*np.pi/(self.psi_fac*self.phi_sign)
+
+
+
 if __name__ == '__main__':
 
-    feqdsk = '/afs/ipp/home/g/git/python/maingui/28053_1.2003s.eqdsk17'
+    feqdsk = '/afs/ipp/home/g/git/python/maingui/28053_1.2003s.eqdsk'
 #    feqdsk = '23076W01.eqdsk'
     eq = EQDSK()
     eq.read(feqdsk)
