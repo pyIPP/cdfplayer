@@ -303,7 +303,7 @@ class EQDSK(dict):
 
         self.Br /= -abs(self.psi_fac)
         self.Bz /= -abs(self.psi_fac)
-        self.Bt *= -2*np.pi/(self.psi_fac*self.phi_sign)
+        self.Bt *= -self.psi_sign*self.phi_sign
 
 
 
