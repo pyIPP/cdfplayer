@@ -752,7 +752,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='RABBIT viewer')
     parser.add_argument('-cdf', '--cdf_file', type=str, help='CDF filename', required=False)
-    parser.add_argument('-list', '--list_file', type=str, help='List of signals to plot', required=False)
+    parser.add_argument('-list', '--list_file', type=str, help='List of signals to plot', required=False, default='')
     parser.add_argument('-rid', '--runid', type=str, help='List of signals to plot', required=False)
 
     args = parser.parse_args()
@@ -770,9 +770,4 @@ if __name__ == "__main__":
     else:
         cdf_file = args.cdf_file
 
-    if args.list_file is None:
-        list_file = ''
-    else:
-        list_file = args.list_file
-
-    VIEWER(cdf_file, list_file=list_file)
+    VIEWER(cdf_file, list_file=args.list_file)
