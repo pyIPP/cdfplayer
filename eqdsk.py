@@ -293,8 +293,8 @@ class EQDSK(dict):
 
         from scipy.interpolate import interp1d
 
-        dr = (self.Rgrid[-1] - self.Rgrid[0])/float(self.NW - 1)
-        dz = (self.Zgrid[-1] - self.Zgrid[0])/float(self.NH - 1)
+        dr = self.Rgrid[1] - self.Rgrid[0]
+        dz = self.Zgrid[1] - self.Zgrid[0]
         fBt = interp1d(self.psi1d, self.FPOL, kind='linear', fill_value='extrapolate')
 
         Bpol = np.gradient(self.PSIRZ, dr, dz)/self.Rgrid[:, None]
@@ -302,8 +302,8 @@ class EQDSK(dict):
         self.Bz = -Bpol[0]
         self.Bt = fBt(self.PSIRZ)/self.Rgrid[:, None]
 
-        self.Br /= -Bpol[1]/abs(self.psi_fac)
-        self.Bz /=  Bpol[0]/abs(self.psi_fac)
+        self.Br = -Bpol[1]/abs(self.psi_fac)
+        self.Bz =  Bpol[0]/abs(self.psi_fac)
         self.Bt *= -self.psi_sign*self.phi_sign
 
 
