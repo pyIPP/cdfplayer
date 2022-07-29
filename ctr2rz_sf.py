@@ -136,14 +136,13 @@ class CTR2RZ:
 
         print('Calculating B-field components')
 
-        dR  = np.gradient(self.Rgrid)
-        dz  = np.gradient(self.Zgrid)
-        d_dr = np.apply_along_axis(np.gradient, 0, self.pfm)/dR[:, None]
-        d_dz = np.apply_along_axis(np.gradient, 1, self.pfm)/dz[None, :]
-#        d_dr = np.gradient(self.pfm, axis=0)/dR[:, None]
-#        d_dz = np.gradient(self.pfm, axis=1)/dz[None, :]
-        self.b_z =  .5/np.pi*d_dz/self.Rgrid[:, None]
-        self.b_r = -.5/np.pi*d_dr/self.Rgrid[:, None]
+        dr = self.Rgrid[1] - self.Rgrid[0]
+        dz = self.Zgrid[1] - self.Zgrid[0]
+
+        b_pol = np.gradient(self.pfm, dr, dz)/self.Rgrid[:, None]
+
+        self.b_z =  b_pol[1]/(2.*np.pi)
+        self.b_r = -b_pol[0]/(2.*np.pi)
         self.b_t = -self.rbp/self.Rgrid[:, None]
         self.b_z[:,  0] = self.b_z[:,  1]
         self.b_z[:, -1] = self.b_z[:, -2]

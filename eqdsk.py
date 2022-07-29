@@ -297,12 +297,13 @@ class EQDSK(dict):
         dz = (self.Zgrid[-1] - self.Zgrid[0])/float(self.NH - 1)
         fBt = interp1d(self.psi1d, self.FPOL, kind='linear', fill_value='extrapolate')
 
-        self.Br = np.apply_along_axis(np.gradient, 1,  self.PSIRZ)/self.Rgrid[:, None]/dr
-        self.Bz = np.apply_along_axis(np.gradient, 0, -self.PSIRZ)/self.Rgrid[:, None]/dz
+        Bpol = np.gradient(self.PSIRZ, dr, dz)/self.Rgrid[:, None]
+        self.Br = Bpol[1]
+        self.Bz = -Bpol[0]
         self.Bt = fBt(self.PSIRZ)/self.Rgrid[:, None]
 
-        self.Br /= -abs(self.psi_fac)
-        self.Bz /= -abs(self.psi_fac)
+        self.Br /= -Bpol[1]/abs(self.psi_fac)
+        self.Bz /=  Bpol[0]/abs(self.psi_fac)
         self.Bt *= -self.psi_sign*self.phi_sign
 
 
