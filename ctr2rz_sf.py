@@ -82,7 +82,7 @@ class CTR2RZ:
             print('CDF time = %8.4f, CLISTE time = %8.4f' %(self.time, self.eq_time))
             self.pf_eq_sep = eq['PFxx'][1, jt_aug]
             self.pf_shift = self.pf_eq_sep - pf1d[-1]
-            pf_out = eq['PFM'][:, :, jt_aug]
+            pf_out = eq['PFM'][:nr, :nz, jt_aug]
         else:
             Rmin = min(self.Rsurf[-1]) - 0.02
             Rmax = max(self.Rsurf[-1]) + 0.02
@@ -125,6 +125,7 @@ class CTR2RZ:
 
 # clean nan's outside sep
         ind_nan = np.isnan(self.pfm)
+
         self.pfm[ind_nan] = pf_out[ind_nan] # CLISTE outside
         self.rbp[ind_nan] = 2*self.rb[-1] - self.rb[-2]
 
@@ -160,10 +161,10 @@ if __name__ == '__main__':
     tail = runid[-3:]
     fcdf = '/afs/ipp/home/g/git/tr_client/AUGD/%s/%s/%s.CDF' %(shot, tail, runid)
     rz = CTR2RZ(fcdf, tim=3., n_the=3601)
-    psi = rz.pfm[:, :].T
+    psi = rz.pfm[:, :]
     Rax = rz.R0
     zax = rz.Z0
-    X, Y = np.meshgrid(rz.Rgrid, rz.Zgrid)
+    X, Y = np.meshgrid(rz.Rgrid, rz.Zgrid, indexing='ij')
 
     b_p = np.hypot(rz.b_r, rz.b_z)
 
@@ -179,7 +180,7 @@ if __name__ == '__main__':
     plt.title('Psi')
     plt.xlabel('R [cm]')
     plt.ylabel('z [cm]')
-    levels = rz.pf[::-1]
+    levels = rz.pf[::]
 
     plt.contour(X, Y, psi, levels)
     plt.colorbar()
@@ -209,7 +210,7 @@ if __name__ == '__main__':
     plt.xlabel('R [cm]')
     plt.ylabel('z [cm]')
     levels = np.linspace(np.min(rz.b_r), np.max(rz.b_r), n_levels)
-    plt.contourf(X, Y, rz.b_r.T, levels)
+    plt.contourf(X, Y, rz.b_r, levels)
     plt.colorbar()
 
     plt.subplot(2, 3, 3, aspect='equal')
@@ -217,7 +218,7 @@ if __name__ == '__main__':
     plt.xlabel('R [cm]')
     plt.ylabel('z [cm]')
     levels = np.linspace(np.min(rz.b_z), np.max(rz.b_z), n_levels)
-    plt.contourf(X, Y, rz.b_z.T, levels)
+    plt.contourf(X, Y, rz.b_z, levels)
     plt.colorbar()
 
     plt.subplot(2, 3, 5, aspect='equal')
@@ -225,7 +226,7 @@ if __name__ == '__main__':
     plt.xlabel('R [cm]')
     plt.ylabel('z [cm]')
     levels = np.linspace(np.min(b_p), np.max(b_p), n_levels)
-    plt.contourf(X, Y, b_p.T, levels)
+    plt.contourf(X, Y, b_p, levels)
     plt.colorbar()
 
     plt.subplot(2, 3, 6, aspect='equal')
@@ -233,7 +234,7 @@ if __name__ == '__main__':
     plt.xlabel('R [cm]')
     plt.ylabel('z [cm]')
     levels = np.linspace(np.min(rz.b_t), np.max(rz.b_t), n_levels)
-    plt.contourf(X, Y, rz.b_t.T, levels)
+    plt.contourf(X, Y, rz.b_t, levels)
     plt.colorbar()
 
     fpdf = 'fields_tb_cliste.pdf'
