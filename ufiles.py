@@ -159,6 +159,24 @@ class UFILE(dict):
         self.f['data'] = tmp.reshape(shape)
 
 
+    def uslice(self, val=0., axis=0):
+
+        self.ext = self.ext + '_SLICE%d' %axis
+        fun = self.f['data']
+        if axis == 0:
+            jclose = np.argmin(np.abs(self.X['data'] - val))
+            self.X['data'] = np.atleast_1d(self.X['data'][jclose])
+            self.f['data'] = fun[jclose: jclose+1]
+        elif axis == 1:
+            jclose = np.argmin(np.abs(self.Y['data'] - val))
+            self.Y['data'] = np.atleast_1d(self.Y['data'][jclose])
+            self.f['data'] = fun[:, jclose: jclose+1]
+        elif axis == 2:
+            jclose = np.argmin(np.abs(self.Y['data'] - val))
+            self.Y['data'] = np.atleast_1d(self.Y['data'][jclose])
+            self.f['data'] = fun[:, :, jclose: jclose+1]
+
+
     def write(self, udir=None, dev='AUGD'):
 
         self.shot = int(self.shot)
@@ -287,10 +305,10 @@ class UFILE(dict):
             plt.xlabel('%s [%s]' %(self.X['name'], self.X['unit'] ) )
             plt.ylabel('%s [%s]' %(self.f['name'], self.f['unit'] ) )
         elif data.ndim == 2:
-            X, Y = np.meshgrid(self.X['data'], self.Y['data'])
+            X, Y = np.meshgrid(self.X['data'], self.Y['data'], indexing='ij')
             plt.figure('u-file', (7, 8))
             plt.subplot(1, 1, 1)
-            plt.contourf(X, Y, data.T, levels=20)
+            plt.contourf(X, Y, data, levels=20)
             plt.colorbar()
             plt.xlabel('%s [%s]' %(self.X['name'], self.X['unit'] ) )
             plt.ylabel('%s [%s]' %(self.Y['name'], self.Y['unit'] ) )

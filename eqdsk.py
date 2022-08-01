@@ -141,13 +141,13 @@ class EQDSK(dict):
 
         psi_grid = np.linspace(self.SIMAG, self.SIBRY, self.NW)
 
-        X, Y = np.meshgrid(self.Rgrid, self.Zgrid)
+        X, Y = np.meshgrid(self.Rgrid, self.Zgrid, indexing='ij')
 
         plt.figure('EQDSK', (14, 8))
         plt.subplots_adjust(top=0.95, bottom=0.1, left=0.1, right=0.95, hspace=0, wspace=0.5)
 
         plt.subplot2grid((5, 2), (0, 0), rowspan=5, aspect='equal')
-        plt.contourf(X, Y, self.PSIRZ.T, levels=20, cmap=cm.jet)
+        plt.contourf(X, Y, self.PSIRZ, levels=20, cmap=cm.jet)
         plt.colorbar()
         plt.xlabel('R [m]')
         plt.ylabel('Z [m]')
