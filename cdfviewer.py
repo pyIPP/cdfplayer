@@ -264,12 +264,17 @@ class VIEWER:
 
 # Equilibrium
 
-        if hasattr(self, 'surf'):
-            self.R = self.surf.Rsurf
-            self.Z = self.surf.Zsurf
-        else:
-            self.R = self.cv['Rsurf'].data
-            self.Z = self.cv['Zsurf'].data
+        if hasattr(self, 'surf'): # TRANSP
+            self.R =  self.surf.Rsurf
+            self.Z =  self.surf.Zsurf
+        else: # ASTRA
+            if 'Rsurf' in self.cv.keys():
+                self.R = self.cv['Rsurf'].data
+                self.Z = self.cv['Zsurf'].data
+            else:
+                self.R = self.cv['r2d'].data
+                self.Z = self.cv['z2d'].data
+
         self.n_rho = self.R.shape[1]
         logger.debug('Nrho_eq = %d' %self.n_rho)
         logger.debug(self.R.shape)
@@ -546,7 +551,9 @@ class VIEWER:
         strtim = 't =%6.3f s' %self.time[self.jt]
         if self.jtab == 0:
             for jrho in range(self.n_rho):
-                self.equline[jrho].set_data(self.R[self.jt, jrho, :], self.Z[self.jt, jrho, :])
+                Rplot = np.append(self.R[self.jt, jrho, :], self.R[self.jt, jrho, 0])
+                Zplot = np.append(self.Z[self.jt, jrho, :], self.Z[self.jt, jrho, 0])
+                self.equline[jrho].set_data(Rplot, Zplot)
             self.txt_eq.set_text(strtim)
 # Plot mag. axis:
             if hasattr(self, 'surf'):
