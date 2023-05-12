@@ -1,5 +1,5 @@
 import os
-from scipy.io import netcdf
+from scipy.io import netcdf_file
 import numpy as np
 import get_sf_grid, tr_read_ctr
 
@@ -36,7 +36,7 @@ class CTR2RZ:
 
 # Read TRANSP output
 
-        cv = netcdf.netcdf_file(cdf_file, 'r', mmap=False).variables
+        cv = netcdf_file(cdf_file, 'r', mmap=False).variables
 
 # Time point
 

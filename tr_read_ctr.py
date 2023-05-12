@@ -1,5 +1,5 @@
 import os
-from scipy.io import netcdf
+from scipy.io import netcdf_file
 import numpy as np
 import mom2rz
 
@@ -16,7 +16,7 @@ class TR_READ_CTR:
         else:
             print('Reading Fourier moments from file %s' %fcdf)
 
-        cv = netcdf.netcdf_file(fcdf, 'r', mmap=False).variables
+        cv = netcdf_file(fcdf, 'r', mmap=False).variables
 
         ntim, nxb = cv['RMC00'].shape
 

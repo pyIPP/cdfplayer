@@ -22,7 +22,7 @@ except:
     from matplotlib.backends.backend_tkagg import NavigationToolbar2TkAgg as nt2tk
 
 from matplotlib.figure import Figure
-from scipy.io import netcdf
+from scipy.io import netcdf_file
 
 
 fmt = logging.Formatter('%(asctime)s | %(name)s | %(levelname)s: %(message)s', '%H:%M:%S')
@@ -204,7 +204,7 @@ class VIEWER:
         if hasattr(self, 'surf'):
             del self.surf
         logger.info('Reading profiles from %s', f_cdf)
-        self.cv = netcdf.netcdf_file(f_cdf, 'r', mmap=False).variables
+        self.cv = netcdf_file(f_cdf, 'r', mmap=False).variables
 
         logger.info('Reading equilibrium from %s', f_cdf)
         rho = np.linspace(0.1, 1.0, 10)

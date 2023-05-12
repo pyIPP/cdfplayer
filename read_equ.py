@@ -1,4 +1,4 @@
-from scipy.io import netcdf
+from scipy.io import netcdf_file
 import numpy as np
 
 
@@ -7,7 +7,7 @@ class READ_EQU:
 
     def __init__(self, cdf_file, tvec=None, rho=None):
 
-        cv1 = netcdf.netcdf_file(cdf_file, 'r', mmap=False).variables
+        cv1 = netcdf_file(cdf_file, 'r', mmap=False).variables
         cv = {}
         for key, val in cv1.items():
             cv[key] = np.atleast_1d(val.data)
