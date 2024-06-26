@@ -271,9 +271,12 @@ class VIEWER:
             if 'Rsurf' in self.cv.keys():
                 self.R = self.cv['Rsurf'].data
                 self.Z = self.cv['Zsurf'].data
-            else:
+            elif 'r2d' in self.cv.keys():
                 self.R = self.cv['r2d'].data
                 self.Z = self.cv['z2d'].data
+            else:
+                self.R = self.cv['r'].data
+                self.Z = self.cv['z'].data
 
         self.n_rho = self.R.shape[1]
         logger.debug('Nrho_eq = %d' %self.n_rho)
@@ -764,12 +767,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    cdf_file  = '/afs/ipp/home/g/git/tr_client/AUGD/23076/W01/23076W01.CDF'
+    cdf_file  = '/shares/departments/AUG/users/git/tr_client/AUGD/23076/W01/23076W01.CDF'
     list_file = ''
 
     if args.cdf_file is None:
         if args.runid is None:
-            cdf_file  = '/afs/ipp/home/g/git/tr_client/AUGD/23076/W01/23076W01.CDF'
+            cdf_file  = '/shares/departments/AUG/users/git/tr_client/AUGD/23076/W01/23076W01.CDF'
         else:
             shot = args.runid[:-3]
             tail = args.runid[-3:]
