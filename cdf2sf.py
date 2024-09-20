@@ -357,22 +357,6 @@ def cdf2tra(runid):
     sf.write_sf(nshot, sfh_dic, sfhdir, 'TRA', exp=os.getenv('USER'))
 
 
-def cdf2nub(runid):
-
-    homdir = os.getenv('HOME')
-    os.system('mkdir -p %s/shotfiles/NUB' %homdir)
-    source = '/afs/ipp/home/n/nubeam/pub/NUB00000.sfh.temp'
-    sfhdir = '%s/nb_client/AUGD' %homdir
-    nshot = int(runid[0:5])
-    tail = runid[5:8]
-    fcdf = '%s/%d/%s/%s.cdf' %(sfhdir, nshot, tail, runid)
-    fnml = '%s/%d/%s.nml'    %(sfhdir, nshot, runid)
-    fsfh = '%s/NUB00000.sfh' %sfhdir
-
-    sfh_dic = sfh_mod(fcdf, nml=fnml, fsfh_in=source, fsfh_out=fsfh)
-    sf.write_sf(nshot, sfh_dic, sfhdir, 'NUB', exp=os.getenv('USER'))
-
-
 if __name__ == "__main__":
 
     import sys

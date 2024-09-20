@@ -159,7 +159,7 @@ if __name__ == '__main__':
     runid = '29783A01'
     shot = runid[:-3]
     tail = runid[-3:]
-    fcdf = '/afs/ipp/home/g/git/tr_client/AUGD/%s/%s/%s.CDF' %(shot, tail, runid)
+    fcdf = '/shares/departments/AUG/users/git/tr_client/AUGD/%s/%s/%s.CDF' %(shot, tail, runid)
     rz = CTR2RZ(fcdf, tim=3., n_the=3601)
     psi = rz.pfm[:, :]
     Rax = rz.R0

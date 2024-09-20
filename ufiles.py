@@ -188,7 +188,7 @@ class UFILE(dict):
             comment = ''
 
         if udir is None:
-            udir = '%s/udb/%s' %(os.getenv('HOME'), s5shot)
+            udir = '/shares/departments/AUG/users/%s/udb/%s' %(os.getenv('USER'), s5shot)
         os.system('mkdir -p %s' %udir)
         uf = '%s/%s%s.%s' %(udir, self.pre, s5shot, self.ext)
         logger.debug('Output file %s', uf)

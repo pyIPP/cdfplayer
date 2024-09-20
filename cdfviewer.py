@@ -23,7 +23,7 @@ except:
 
 from matplotlib.figure import Figure
 from scipy.io import netcdf_file
-
+from scipy.interpolate import interp1d
 
 fmt = logging.Formatter('%(asctime)s | %(name)s | %(levelname)s: %(message)s', '%H:%M:%S')
 hnd = logging.StreamHandler()
@@ -47,7 +47,7 @@ class VIEWER:
 
 
     timeout = 1e-10
-    dir_set = '%s/python/cdfp' %os.getenv('HOME')
+    dir_set = '/shares/departments/AUG/users/%s/python/cdfp' %os.getenv('USER')
 
     inNextOrPrev = False
 
@@ -368,7 +368,7 @@ class VIEWER:
 
         import eqdsk
 
-        cdf1d = ['PCUR', 'BZ', 'BZXR', 'RAXIS', 'YAXIS']
+        cdf1d = ['PCUR', 'BZ', 'BZXR', 'RAXIS', 'YAXIS', 'Q0']
         cdf2d = ['PLFLX', 'Q', 'GFUN', 'PMHD_IN']
         coord = ['XB', 'X']
 
@@ -379,6 +379,7 @@ class VIEWER:
         t_in = self.time[self.jt]
 
         rz = ctr2rz_sf.CTR2RZ(self.cdf_file, it=self.jt, cliste=cliste)
+        print('Cliste?', cliste, len(rz.Rgrid))
 
         if not hasattr(rz, 'Rgrid'):
             logger.error('No related CLISTE shotfile found -> no eqdsk file written')
@@ -390,13 +391,21 @@ class VIEWER:
 
         data['fpol'] = -0.01*data['GFUN']*data['BZXR']
 
-        xb_grid = np.append(0, data['XB'])
-        n_xb = len(xb_grid)
+#        xb_grid = np.append(0, data['XB'])
+        nw = len(rz.Rgrid)
+        eqdsk_grid = np.linspace(0, 1, nw)
+        xb_tr0 = np.append(0., data['XB'])
+        pfl_tr0 = np.append(0., 2*np.pi*data['PLFLX'])
+        q_tr0   = np.append(data['Q0'], data['Q'])
 
-        pfl  = np.append(0, 2*np.pi*data['PLFLX'])
-        qpsi = np.interp(xb_grid, data['XB'], data['Q'])
-        fpol = np.interp(xb_grid, data['XB'], data['fpol'])
-        Pres = np.interp(xb_grid, data['X'] , data['PMHD_IN'])
+        qpsi = np.interp(eqdsk_grid, xb_tr0, q_tr0)
+        pfl  = np.interp(eqdsk_grid, xb_tr0, pfl_tr0)
+        f_fpol = interp1d(data['XB'], data['fpol'], fill_value='extrapolate')
+        f_pres = interp1d(data['X'], data['PMHD_IN'], fill_value='extrapolate')
+        fpol = f_fpol(eqdsk_grid)
+        Pres = f_pres(eqdsk_grid)
+        print('PSIaxis', pfl[0])
+        pfl[0] = 0.
 
 # Derivatives d/dPsi
         coco_fac = -1/(2.*np.pi)
@@ -406,7 +415,7 @@ class VIEWER:
         dPres = np.gradient(Pres)/dpsi
 
         GEQ = {}
-        GEQ['NW'] = len(rz.Rgrid)
+        GEQ['NW'] = nw
         GEQ['NH'] = len(rz.Zgrid)
         GEQ['RLEFT']   = rz.Rgrid[0]
         GEQ['ZMID']    = 0.5*(rz.Zgrid[0] + rz.Zgrid[-1])
@@ -414,8 +423,8 @@ class VIEWER:
         GEQ['ZDIM']    = rz.Zgrid[-1] - rz.Zgrid[0]
         GEQ['RMAXIS']  = data['RAXIS']
         GEQ['ZMAXIS']  = data['YAXIS']
-        GEQ['SIMAG']   = pfl[0]  * coco_fac
-        GEQ['SIBRY']   = pfl[-1] * coco_fac
+        GEQ['SIMAG']   = 0.
+        GEQ['SIBRY']   = 2*np.pi*data['PLFLX'][-1] * coco_fac
         GEQ['CURRENT'] = data['PCUR']
         GEQ['BCENTR']  = data['BZ']
         GEQ['RCENTR']  = data['BZXR']/GEQ['BCENTR']
@@ -560,7 +569,7 @@ class VIEWER:
             self.txt_eq.set_text(strtim)
 # Plot mag. axis:
             if hasattr(self, 'surf'):
-                self.equline['axis'].set_data(self.surf.r_mag[self.jt], self.surf.z_mag[self.jt])
+                self.equline['axis'].set_data([self.surf.r_mag[self.jt]], [self.surf.z_mag[self.jt]])
             self.fig_eq.canvas.draw()
 
         elif self.jtab == 1:
@@ -639,7 +648,7 @@ class VIEWER:
 
     def callcdf(self):
 
-        dir_init = '%s/tr_client/%s' %(os.getenv('HOME'), self.tok)
+        dir_init = '/shares/departments/AUG/users/%s/tr_client/%s' %(os.getenv('USER'), self.tok)
         self.cdf_file = tkfd.askopenfilename(initialdir=dir_init, filetypes=[("All formats", "*.CDF")])
 
         self.load()
@@ -763,7 +772,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='RABBIT viewer')
     parser.add_argument('-cdf', '--cdf_file', type=str, help='CDF filename', required=False)
     parser.add_argument('-list', '--list_file', type=str, help='List of signals to plot', required=False, default='')
-    parser.add_argument('-rid', '--runid', type=str, help='List of signals to plot', required=False)
+    parser.add_argument('-rid', '--runid', type=str, help='List of signals to plot', required=False, nargs='?', const='')
 
     args = parser.parse_args()
 
@@ -771,12 +780,12 @@ if __name__ == "__main__":
     list_file = ''
 
     if args.cdf_file is None:
-        if args.runid is None:
+        if args.runid is None or not args.runid:
             cdf_file  = '/shares/departments/AUG/users/git/tr_client/AUGD/23076/W01/23076W01.CDF'
         else:
             shot = args.runid[:-3]
             tail = args.runid[-3:]
-            cdf_file = '%s/tr_client/AUGD/%s/%s/%s.CDF' %(os.getenv('HOME'), shot, tail, args.runid)
+            cdf_file = '/shares/departments/AUG/users/%s/tr_client/AUGD/%s/%s/%s.CDF' %(os.getenv('USER'), shot, tail, args.runid)
     else:
         cdf_file = args.cdf_file
 

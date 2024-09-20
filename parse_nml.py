@@ -38,7 +38,7 @@ def parsenml(nml, parname, fmt=5):
 
 
 if __name__ == "__main__":
-    nml = '/afs/ipp/home/g/git/tr_client/AUGD/23076/W01/23076W01TR.DAT'
+    nml = '/shares/departments/AUG/users/git/tr_client/AUGD/23076/W01/23076W01TR.DAT'
     cl1 = parsenml(nml, 'gfrac', fmt=5)
     print(cl1)
     cl2 = parsenml(nml, 'frac', fmt=5)

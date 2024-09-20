@@ -102,9 +102,9 @@ class EQDSK(dict):
         f = open(f_eqdsk,  'w')
 # Scalars
         if hasattr(self, 'CASE2'):
-            f.write('%s %d %d %d\n' %(self.CASE2, idum, self.NW, self.NH) )
+            f.write('%48s%4d%4d%4d\n' %(self.CASE2, idum, self.NW, self.NH) )
         else:
-            f.write('%s%s%s%s%s%s %d %d %d\n' %(*self.CASE, idum, self.NW, self.NH) )
+            f.write('%8s%8s%8s%8s%8s%8s%4d%4d%4d\n' %(*self.CASE, idum, self.NW, self.NH) )
         f.write( format_str % (self.RDIM, self.ZDIM, self.RMAXIS, self.RLEFT, self.ZMID) )
         f.write( format_str % (self.RMAXIS, self.ZMAXIS, self.SIMAG, self.SIBRY, self.BCENTR) )
         f.write( format_str % (self.CURRENT, self.SIMAG, xdum, self.RMAXIS, xdum) )
@@ -310,7 +310,7 @@ class EQDSK(dict):
 
 if __name__ == '__main__':
 
-    feqdsk = '/afs/ipp/home/g/git/python/maingui/28053_1.2003s.eqdsk'
+    feqdsk = '/shares/departments/AUG/users/git/python/maingui/28053_1.2003s.eqdsk'
 #    feqdsk = '23076W01.eqdsk'
     eq = EQDSK()
     eq.read(feqdsk)

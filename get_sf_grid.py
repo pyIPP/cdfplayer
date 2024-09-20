@@ -13,7 +13,7 @@ def get_grid(runid):
 # Parse namelist for info about equilibrium exp-diag-ed
 
     nshot = int(runid[:5])
-    io_dir = '%s/tr_client/AUGD/%d/%s' %(os.getenv('HOME'), nshot, runid[5:])
+    io_dir = '/shares/departments/AUG/users/%s/tr_client/AUGD/%d/%s' %(os.getenv('USER'), nshot, runid[5:])
 
     nml = '%s/%sTR.DAT' %(io_dir, runid)
     print('Parsing %s' %nml)
