@@ -1,51 +1,30 @@
+import re
 import numpy as np
 
 def wr_for(arr_in, fmt='%13.6E', n_lin=6):
-
     arr_flat = arr_in.T.ravel()
-    nx = len(arr_flat)
-    out_str=''
-    for jx in range(nx):
-        out_str += (fmt %arr_flat[jx])
-        if (jx%n_lin == n_lin - 1):
-            out_str += '\n'
-# Line break after writing data, but no double break
-    if (nx%n_lin != 0):
-        out_str += '\n'
+    lines = [
+        ''.join(fmt % val for val in arr_flat[i:i + n_lin])
+        for i in range(0, len(arr_flat), n_lin)
+    ]
+    return '\n'.join(lines) + '\n'
 
-    return out_str
+def ssplit(line):
+# This pattern matches a '-' that is immediately preceded by a digit
+    line_clean = re.sub(r'(?<=\d)-', ' -', line)
+    b = [float(num) for num in line_clean.split()]
+    return b
 
+def lines2fltarr(lines, dtyp=np.float32):
+    return np.fromiter(
+        (num for line in lines for num in ssplit(line)),
+        dtype=dtyp)
 
-def ssplit(ll):
-
-    tmp = ll.replace('-', ' -')
-    tmp = tmp.replace('e -', 'e-')
-    tmp = tmp.replace('E -', 'E-')
-    slist = tmp.split()
-    a = [float(i) for i in slist]
-
-    return a
-
-
-def lines2fltarr(lines, dtyp=None):
-
-    data = []
-    for line in lines:
-        data += ssplit(line)
-    if dtyp is None:
-        dtyp = np.float32
-
-    return np.array(data, dtype=dtyp)
-
-
-def fltarr_len(lines, nx, dtyp=None):
-
+def fltarr_len(lines, nx, dtyp=np.float32):
+# for rabbitview
     data = []
     for jlin, line in enumerate(lines):
-        data += ssplit(line)
+        data.extend(ssplit(line))
         if len(data) >= nx:
             break
-    if dtyp is None:
-        dtyp = np.float32
-
     return jlin+1, np.array(data, dtype=dtyp)

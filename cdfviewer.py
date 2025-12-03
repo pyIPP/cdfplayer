@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, os, logging
+import sys, os, re, logging
 
 try:
     import Tkinter as tk
@@ -42,6 +42,8 @@ def to_str(str_or_byt):
     str_out = str_or_byt.decode('utf8') if isinstance(str_or_byt, bytes) else str_or_byt
     return str_out.strip()
 
+def parse_group_line(line):
+    return [p.strip().upper() for p in re.split(r'\\+', line) if p.strip()]
 
 class VIEWER:
 
@@ -219,13 +221,16 @@ class VIEWER:
         self.line1d  = {}
         self.line2d  = {}
         logger.debug('list_file %s', self.list_file)
-        if os.path.isfile(self.list_file) and pr_list is None:
-            f = open(self.list_file)
-            pr_list = [s.strip() for s in f.readlines()]
-            f.close()
-            logger.info('Using profile list from file %s', self.list_file)
-        elif pr_list is None:
-            pr_list = ['CUR', 'TE', 'NE', 'V', 'BPOL', 'NEUTT', 'NIMP', 'PINJ', 'TAUEA']
+        if pr_list is not None:
+            self.pr_list = pr_list
+        else:
+            if os.path.isfile(self.list_file):
+                f = open(self.list_file)
+                self.pr_list = [s.strip() for s in f.readlines()]
+                f.close()
+                logger.info('Using profile list from file %s', self.list_file)
+            else:
+                self.pr_list = ['CUR', 'TE', 'NE', 'V', 'BPOL', 'NEUTT', 'NIMP', 'PINJ', 'TAUEA']
  
         if 'TIME3' in self.cv.keys():
             self.time = self.cv['TIME3'].data
@@ -239,19 +244,26 @@ class VIEWER:
         self.unit = {}
         self.prof_list  = []
         self.trace_list = []
-        for sig in pr_list:
-            sig = sig.upper()
-            if sig in self.cv.keys():
-                self.lbl[sig]  = self.cv[sig].long_name[:-2]
-                self.dim[sig]  = self.cv[sig].dimensions
-                self.unit[sig] = self.cv[sig].units.decode('utf-8')
-                self.nt = self.cv[sig].data.shape[0]
-                if self.cv[sig].data.ndim > 1:
-                    self.prof_list.append(sig)
-                else:
-                    self.trace_list.append(sig)
+        for line in self.pr_list:
+            for sig in parse_group_line(line):  #going away from chatgpt
+                sig = sig.upper()
+                if sig in self.cv.keys():
+                    self.lbl[sig]  = self.cv[sig].long_name[:-2]
+                    self.dim[sig]  = self.cv[sig].dimensions
+                    self.unit[sig] = self.cv[sig].units.decode('utf-8')
+                    self.nt = self.cv[sig].data.shape[0]
+
+        for line in self.pr_list:
+            grp = [s for s in parse_group_line(line) if s in self.cv.keys()]
+            if not grp:
+                continue
+            # Decide group type by the first valid member
+            nd = self.cv[grp[0]].data.ndim
+            if nd > 1:
+                self.prof_list.append(grp)
             else:
-                logger.warning('No variable %s in CDF file, ignoring!', sig)
+                self.trace_list.append(grp)
+
 
         if len(self.trace_list) > 15:
             logger.warning('Too many time traces, taking only the first 15')
@@ -317,43 +329,81 @@ class VIEWER:
 
         except:
             pass
-
+        self.line1d  = {}   # key: tuple(group), value: list of Line2D
+        self.mark1d  = {}   # key: tuple(group), value: list of Line2D markers
         jplot = 1
-        for trace in self.trace_list:
-            ylab = '%s [%s]' %(trace, self.unit[trace].strip())
+        for grp in self.trace_list:
+            key = tuple(grp)
+            # y-label from first signal, but add a legend to disambiguate
+            ylab = '%s [%s]' %(grp[0], self.unit[grp[0]].strip())
 
             ax_1d = self.fig_1d.add_subplot(nrow, ncol, jplot)
             ax_1d.set_xlabel('t [s]', fontsize=fsize)
             ax_1d.set_ylabel(ylab, fontsize=fsize)
-            self.line1d[trace], = ax_1d.plot(self.time, self.cv[trace][:], 'b-')
             ax_1d.grid('on')
-            self.mark1d[trace], = ax_1d.plot(self.time[0], self.cv[trace][0], 'go')
-            jplot += 1
             ax_1d.ticklabel_format(axis='y', style='sci', scilimits=(-4, 4))
             ax_1d.yaxis.major.formatter._useMathText = True
 
+            self.line1d[key] = []
+            self.mark1d[key] = []
+            for sig in grp:
+                ln, = ax_1d.plot(self.time, self.cv[sig][:], '-', label=sig)
+                mk, = ax_1d.plot(self.time[0], self.cv[sig][0], 'o')
+                self.line1d[key].append(ln)
+                self.mark1d[key].append(mk)
+
+            ax_1d.legend(loc='best', fontsize=9)
+            ax_1d.relim()
+            ax_1d.autoscale_view()
+            jplot += 1
+        self.line2d = {}  # key: tuple(group) -> list of Line2D
+
         jplot = 1
-        for prof in self.prof_list:
-            if 'X' in self.dim[prof]:
+        for grp in self.prof_list:
+            key = tuple(grp)
+            # decide x grid / label using the first signal in the group
+            first = grp[0]
+            if 'X' in self.dim[first]:
                 xrho = self.rho
                 xlab = r'$\rho_{tor}$(X)'
-            elif 'XB' in self.dim[prof]:
+            elif 'XB' in self.dim[first]:
                 xrho = self.rhob
                 xlab = r'$\rho_{tor}$(XB)'
-            elif 'XRHO' in self.dim[prof]:
+            elif 'XRHO' in self.dim[first]:
                 xrho = self.rho
                 xlab = r'$\rho_{tor}$(XRHO)'
-            ylab = '%s [%s]' %(prof, self.unit[prof].strip())
+            else:
+                xrho = self.rho
+                xlab = r'$\rho_{tor}$'
 
+            ylab = '%s [%s]' %(first, self.unit[first].strip())
             ax_2d = self.fig_2d.add_subplot(nrow, ncol, jplot)
             ax_2d.set_xlim([0, 1.])
-            ax_2d.set_ylim([0, 1.1*np.max(self.cv[prof].data)])
             ax_2d.set_xlabel(xlab, fontsize=fsize)
             ax_2d.set_ylabel(ylab, fontsize=fsize)
-            self.line2d[prof], = ax_2d.plot(xrho, self.cv[prof][0, :], 'b-')
             ax_2d.grid('on')
             ax_2d.ticklabel_format(axis='y', style='sci', scilimits=(-4, 4))
             ax_2d.yaxis.major.formatter._useMathText = True
+
+            self.line2d[key] = []
+            for sig in grp:
+                ln, = ax_2d.plot(xrho, self.cv[sig][0, :], '-', label=sig)
+                self.line2d[key].append(ln)
+            # Fix y-limits to contain all times for this group
+            vmin, vmax = np.inf, -np.inf
+            for sig in grp:
+                #arr = np.asarray(self.cv[sig], dtype=float)   # shape: (nt, nr)
+                arr = np.asarray(np.ma.filled(self.cv[sig][:], np.nan), dtype=float)
+                if arr.size:
+                    vmin = min(vmin, np.nanmin(arr))
+                    vmax = max(vmax, np.nanmax(arr))
+            if np.isfinite(vmin) and np.isfinite(vmax):
+                if vmax == vmin:  # flat data guard
+                    vmax = vmin + 1e-12
+                pad = 0.05 * (vmax - vmin)
+                ax_2d.set_ylim(vmin - pad, vmax + pad)
+
+            ax_2d.legend(loc='best', fontsize=9)
             jplot += 1
 
         self.update_plot()
@@ -573,14 +623,20 @@ class VIEWER:
             self.fig_eq.canvas.draw()
 
         elif self.jtab == 1:
-            for trace in self.trace_list:
-                self.mark1d[trace].set_data(self.time[self.jt], self.cv[trace][self.jt])
+            # 1D traces (grouped)
+            for key, marks in self.mark1d.items():
+                grp = list(key)
+                for sig, mk in zip(grp, marks):
+                    mk.set_data([self.time[self.jt]], [self.cv[sig][self.jt]])
             self.txt_1d.set_text(strtim)
             self.fig_1d.canvas.draw()
 
         elif self.jtab == 2:
-            for prof in self.prof_list:
-                self.line2d[prof].set_ydata(self.cv[prof][self.jt, :])
+            # 2D profiles (grouped)
+            for key, lines in self.line2d.items():
+                grp = list(key)
+                for sig, ln in zip(grp, lines):
+                    ln.set_ydata(self.cv[sig][self.jt, :])
             self.txt_2d.set_text(strtim)
             self.fig_2d.canvas.draw()
 
@@ -664,36 +720,51 @@ class VIEWER:
 
         f_out = tkfd.asksaveasfile(initialdir=self.dir_set, filetypes=[("All formats", "*.txt")])
         out_txt = ''
-        for prof in self.prof_list:
-            out_txt += prof + '\n'
-        for sig in self.trace_list:
-            out_txt += sig + '\n'
+        for prof in self.pr_list:
+            out_txt += to_str(prof) + '\n'
+
         f_out.write(out_txt)
         f_out.close()
 
 
     def editlist(self, profiles=None):
 
-        sig_list = self.prof_list + self.trace_list
         self.topl = tk.Toplevel(self.viewframe)
-        self.topl.resizable(0, 0)
-        ttk.Label(self.topl, text="Profiles to be viewed").grid(row=0, columnspan=3)
-        self.txt = tk.Text(self.topl, width=40, height=10)
-        self.txt.grid(row=1, columnspan=2)
-        self.txt.insert('end', "\n".join(sig_list if profiles is None else profiles))
-        scr = tk.Scrollbar(self.topl)
-        scr.config(command=self.txt.yview)
-        scr.grid(row=1, column=2, sticky=tk.N+tk.S)
-        self.txt.config(yscrollcommand=scr.set)
-        b = ttk.Button(self.topl, text="OK", command=self.dialog_ok)
-        b.grid(row=2, column=0)
-        b = ttk.Button(self.topl, text="Cancel", command=self.topl.destroy)
-        b.grid(row=2, column=1)
+        self.topl.title('Edit setup…')
+        self.txt = tk.Text(self.topl, width=50, height=20)
+
+        # Turn groups (lists/tuples) into "A \ B \ C" strings; leave strings as-is
+        def to_display_lines(seq):
+            lines = []
+            for item in seq:
+                if isinstance(item, (list, tuple)):
+                    lines.append(" \\ ".join(str(s) for s in item))
+                else:
+                    lines.append(str(item))
+            return lines
+
+        if profiles is None:
+            # Build from what is actually plotted now
+            source = to_display_lines(getattr(self, 'prof_list', [])) \
+                + to_display_lines(getattr(self, 'trace_list', []))
+        else:
+            source = to_display_lines(profiles)
+
+        lines = to_display_lines(source)
+        self.txt.insert('end', "\n".join(lines))
+        self.txt.pack(fill='both', expand=True)
+
+        # --- add OK / Cancel buttons (wire to your existing dialog_ok) ---
+        import tkinter.ttk as ttk
+        btns = ttk.Frame(self.topl)
+        btns.pack(fill='x', padx=6, pady=6)
+        ttk.Button(btns, text="OK", command=self.dialog_ok).pack(side='right', padx=6)
+        ttk.Button(btns, text="Cancel", command=self.topl.destroy).pack(side='right')
 
 
     def dialog_ok(self):
 
-        newsigs = self.txt.get("0.0", "end-1c").split()
+        newsigs = [s.strip() for s in self.txt.get("1.0", "end-1c").splitlines() if s.strip()]
         oldprofiles = self.prof_list
         oldtraces   = self.trace_list
         try:
